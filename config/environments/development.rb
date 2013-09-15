@@ -39,9 +39,9 @@ Joruri::Application.configure do
     :address        => '192.168.0.4',
     :port           => 143,
     :usessl         => false,
-    :ssh_address    => '192.168.0.4',
-    :ssh_user_name  => 'joruri',
-    :ssh_password   => 'pass',
+    :ssh_address    => '',
+    :ssh_user_name  => '',
+    :ssh_password   => '',
     :ssh_maildir    => '/home/#{account}/Maildir'
   }
 end

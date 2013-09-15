@@ -1,17 +1,16 @@
 source 'http://rubygems.org'
 
+gem 'rake', '0.8.7'
 gem 'rails', '3.0.0'
-gem 'ruby-mysql', "2.9.4"
-gem 'ruby-ldap', "0.9.11"
-gem "will_paginate", "~> 3.0.pre2"
-gem "jpmobile", "1.0.0.pre"
-gem "net-ssh", "2.0.23"
-gem "ruby-filemagic", "0.4.2"
-#gem "shared-mime-info", "0.1"
-gem "rmagick", "2.13.1"
-gem "mail", "2.2.6.1"
-gem "hpricot", "0.8.3"
-gem "tamtam", "0.0.3"
+gem 'ruby-mysql', '2.9.4'
+gem 'ruby-ldap', '0.9.11'
+gem 'net-ssh', '2.0.23'
+gem 'mail', '2.2.6.1'
+gem 'rmagick', '2.13.1'
+gem 'hpricot', '0.8.3'
+gem 'tamtam', '0.0.3'
+gem 'jpmobile', '1.0.0.pre'
+gem 'will_paginate', '3.0.pre2'
 
 # Bundle edge Rails instead:
 # gem 'rails', :git => 'git://github.com/rails/rails.git'
