@@ -1,0 +1,22 @@
+<%
+
+case @item.input_type
+when :select
+  value_form = f.select(:value, @item.options)
+when :text_field
+  value_form = f.text_field(:value, :style => "width: 300px;")
+when :password_field
+  value_form = f.password_field(:value, :style => "width: 300px;", :autocomplete => 'off')
+end
+
+%><table class="show">
+  
+  <tr>
+    <th>設定名</th>
+    <td><%=h @item.config_name %></td>
+  </tr><tr>
+    <th>設定値</th>
+    <td><%= value_form %><%=raw @item.message if @item.message %></td>
+  </tr>
+
+</table>

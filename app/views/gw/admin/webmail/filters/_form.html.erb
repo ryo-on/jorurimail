@@ -1,0 +1,65 @@
+<%
+
+mailboxes = []
+Gw::WebmailMailbox.load_mailboxes.each do |box|
+  next if box.name =~ /^INBOX$/
+  next if box.name =~ /^(Drafts|Sent|Trash)(\.|$)/
+  mailboxes << [box.slashed_title, "#{box.name}"]
+end
+
+%><script type="text/javascript">
+//<![CDATA[
+function reset_condition(idx) {
+  $('item_in_columns_' + idx).selectedIndex    = 0;
+  $('item_in_inclusions_' + idx).selectedIndex = 0;
+  $('item_in_values_' + idx).value             = '';
+  return false;
+}
+//]]>
+</script>
+
+<table class="show">
+  <tr>
+    <th><%= @item.locale :name %></th>
+    <td><%= f.text_field :name, :class => 'name' %></td>
+  </tr><tr>
+    <th><%= @item.locale :state %></th>
+    <td><%= f.radio_buttons :state, @item.states, :class => 'states' %></td>
+  </tr><tr>
+    <th><%= @item.locale :sort_no %></th>
+    <td><%= f.text_field :sort_no, :class => 'number' %></td>
+  </tr>
+</table>
+
+<br /><p class="form">条件</p>
+<table class="show">
+  <tr>
+    <th><%= @item.locale :conditions_chain %></th>
+    <td><%= f.radio_buttons :conditions_chain, @item.conditions_chain_labels, :class => 'states' %></td>
+  </tr><tr>
+    <th>条件</th>
+    <td>
+      <div <%= %Q(style="padding: 1px 6px; border: 1px solid #f00;") if @item.errors.invalid?(:in_conditions) %>>
+        <% 5.times do |i| %>
+        <div style="margin: 5px 0px;">
+        <%= f.array_select "in_columns[#{i}]", @item.condition_column_labels, :include_blank => true %>
+        <%= f.array_select "in_inclusions[#{i}]", @item.condition_inclusion_labels, :include_blank => true %>
+        <%= f.array_text_field "in_values[#{i}]", :class => "name"  %>
+        <%= link_to "クリア", "#", :onclick => %Q(return reset_condition(#{i});)%>
+        </div>
+        <% end %>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<br /><p class="form">動作</p>
+<table class="show">
+  <tr>
+    <th><%= @item.locale :action %></th>
+    <td><%= f.select :action, @item.action_labels, :include_blank => true %></td>
+  </tr><tr>
+    <th><%= @item.locale :mailbox %></th>
+    <td><%= f.select :mailbox, mailboxes, :include_blank => true %></td>
+  </tr>
+</table>

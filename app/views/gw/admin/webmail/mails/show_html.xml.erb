@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<items>
+<% @item.inline_contents(:show_image => true).each do |inline| %>
+  <% if inline.alternative? || inline.content_type == "text/html" %>
+    <% html_body = inline.html_body ? inline.html_body.gsub(']]>', ']]&gt;') : '' %>
+    <item seqno="<%= inline.seqno %>"><![CDATA[<%=raw html_body %>]]></item>
+  <% end %>
+<% end %>
+</items>

@@ -1,0 +1,50 @@
+<%= javascript_include_tag :defaults %>
+<%= calendar_date_select_includes 'default', :locale => 'ja' %>
+<%= javascript_include_tag "/_common/js/mail_form.js" %>
+<script type="text/javascript">
+//<![CDATA[
+  var confirm_before_submit = function(form) {
+    if (confirm('ごみ箱に移動せず、直接削除します。\n（元に戻すことはできません）')) {
+      $('batchDeleteForm').submit();
+    }
+  }
+//]]>
+</script>
+
+<table id="webmailContainer"><tr><td id="webmailMenu">
+<div id="webmailMenuContainer">
+
+<%= render :partial => "upper_menu" %>
+
+</div>
+</td><td id="webmailContent"><div id="toolContent">
+
+<p class="form">一括削除</p>
+<%= form_tag '', :id => 'batchDeleteForm' do %>
+<table class="show">
+  <tr>
+    <th>対象フォルダ</th>
+    <td>
+      <%= select_tag :mailbox_id, options_for_select([["全てのフォルダ", 0]] + mailbox_selection(@mailboxes), 0) %>
+    </td>
+  </tr>
+  <tr>
+    <th>削除開始日</th>
+    <td>
+      <%= calendar_date_select_tag :start_date, Time.now, :popup => "force" %>
+    </td>
+  </tr>
+  <tr>
+    <th>削除終了日</th>
+    <td>
+      <%= calendar_date_select_tag :end_date, Time.now, :popup => "force" %>
+    </td>
+  </tr>
+</table>
+<br />
+<div class="submitters">
+  <%= submit_tag "一括削除する", :onclick => "confirm_before_submit(this); return false;" %>
+</div>
+<% end %>
+
+</div><!-- end #webmailContainer --></td></table>

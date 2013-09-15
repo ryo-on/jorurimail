@@ -1,0 +1,355 @@
+## Joruri Mail v1.0.0 インストールマニュアル                2011.03.23
+
+**********************************************************************
+ 1 想定環境
+**********************************************************************
+
+[システム]
+OS         : CentOS 5.4
+Webサーバ  : Apache 2.2
+DBシステム : MySQL 5
+Ruby       : 1.9.2-p136
+Rails      : 3.0.0
+Mailサーバ : SMTP, IMAP4
+
+[設定]
+IPアドレス : 192.168.0.2
+ドメイン   : 192.168.0.2
+
+**********************************************************************
+ 2 CentOS のインストール
+**********************************************************************
+
+CentOSをインストールします。
+
+rootユーザに変更します。
+
+  $ su -
+
+======================================================================
+ 2.1 SELinux の無効化
+======================================================================
+
+SELinuxを無効にします。
+  
+  # /usr/sbin/setenforce 0
+
+自動起動を無効にします。
+
+  # vi /etc/sysconfig/selinux 
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  SELINUX=disabled    #変更
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+  ※セキュリティ設定は環境に応じて適切に設定してください。
+
+======================================================================
+ 2.2 Firewall の無効化
+======================================================================
+
+iptablesを停止し、自動起動を無効にします。
+
+  # /sbin/service iptables stop
+  # /sbin/chkconfig iptables off
+
+======================================================================
+ 2.3 パッケージのインストール
+======================================================================
+
+ソースのコンパイルに必要なパッケージをインストールします。
+
+既にインストールされているかを確認します。
+
+  # rpm -qa make gcc-c++ libxslt libxslt-devel libxml2-devel
+  
+なければインストールします。
+
+  # yum install -y make gcc-c++ libxslt libxslt-devel libxml2-devel
+
+**********************************************************************
+ 3 事前準備
+**********************************************************************
+
+必要なパッケージをダウンロードします。
+
+  # cd /usr/local/src/
+  # wget http://joruri.org/download/jorurimail/jorurimail-1.0.0.tar.gz
+  # wget http://image_magick.veidrodis.com/image_magick/ImageMagick-6.6.8-6.tar.gz
+  # wget ftp://ftp.ruby-lang.org/pub/ruby/1.9/ruby-1.9.2-p136.tar.gz
+  # wget http://rubyforge.org/frs/download.php/74445/rubygems-1.6.2.tgz
+
+Joruriユーザを作成します。
+
+  # useradd joruri
+  # passwd joruri
+
+Joruriソースコードを設置します。
+
+  # mkdir /var/share
+  # tar xvzf jorurimail-1.0.0.tar.gz -C /var/share
+  # chown -R joruri:joruri /var/share/jorurimail
+
+**********************************************************************
+ 4 Apache のインストール
+**********************************************************************
+
+Apacheをインストールします。
+
+  # yum install -y httpd httpd-devel
+
+設定ファイルを編集します。
+
+  # vi /etc/httpd/conf/httpd.conf
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  ServerName 192.168.0.2    #変更
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+設定ファイルにエラーがないことを確認し、Apacheを起動します。
+
+  # /sbin/service httpd configtest
+  # /sbin/service httpd start
+
+自動起動に設定します。
+
+  # /sbin/chkconfig httpd on
+
+**********************************************************************
+ 5 MySQL のインストール
+**********************************************************************
+
+MySQLをインストールします。
+
+  # yum install -y mysql-server mysql-devel
+
+文字エンコーディングの標準を UTF-8 に設定します。
+
+  # vi /etc/my.cnf
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  [mysqld]
+  default-character-set=utf8    #追加
+  
+  [client]                      #追加（末尾に追加）
+  default-character-set=utf8    #追加
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+MySQLを起動します。
+
+  # /usr/bin/mysql_install_db --user=mysql
+  # /sbin/service mysqld start
+
+自動起動に設定します。
+
+  # /sbin/chkconfig mysqld on
+  
+rootユーザのパスワードを設定します。
+  # /usr/bin/mysqladmin -u root password "pass"
+
+joruriユーザを作成します。
+  # /usr/bin/mysql -u root -p \
+  #     -e "grant all on *.* to joruri@localhost IDENTIFIED BY 'pass'"
+
+**********************************************************************
+ 6 ImageMagick のインストール
+**********************************************************************
+
+画像関連のパッケージをインストールします。
+
+  # yum -y install libjpeg-devel libpng-devel \
+  #   ghostscript-devel librsvg2-devel
+
+ImageMagickをインストールします。
+
+  # cd /usr/local/src/
+  # tar xvzf ImageMagick-6.6.8-6.tar.gz
+  # cd ImageMagick-6.6.8-6
+  # ./configure --enable-lzw --with-modules
+  # make && make install
+
+**********************************************************************
+ 7 Ruby on Rails のインストール
+**********************************************************************
+
+======================================================================
+ 7.1 Ruby, RubyGems のインストール
+======================================================================
+
+Rubyをインストールします。
+
+  # cd /usr/local/src
+  # tar xvzf ruby-1.9.2-p136.tar.gz
+  # cd ruby-1.9.2-p136
+  # ./configure
+  # make && make install
+
+RubyGemsをインストールします。
+
+  # cd /usr/local/src
+  # tar xvzf rubygems-1.6.2.tgz
+  # cd rubygems-1.6.2
+  # ruby setup.rb
+
+======================================================================
+ 7.2 Phusion Passenger のインストール
+======================================================================
+
+Phusion Passengerをインストールします。
+
+  # gem install passenger -v 3.0.2
+  # passenger-install-apache2-module
+  
+  ( 画面の内容を確認して Enterキーを押してください。 )
+
+  ※補足
+    Apacheをソースからインストールしている場合は下記のように実行して下さい。
+    # export APXS2=/usr/local/apache2/bin/apxs
+    # export PATH=/usr/local/apache2/bin:$PATH
+    # passenger-install-apache2-module
+
+Apacheに設定を追加します。
+
+  # cp /var/share/jorurimail/config/samples/passenger.conf \
+  #     /etc/httpd/conf.d/passenger.conf
+
+======================================================================
+ 7.3 gemライブラリ のインストール
+======================================================================
+
+Rails
+  # gem install rails --include-dependencies -v 3.0.0
+
+Mysql/Ruby
+  # gem install ruby-mysql -v 2.9.4
+
+  ※補足
+    MySQLをソースからインストールしている場合はコマンドが異なります。
+    # env ARCHFLAGS="-arch x86_64" gem install mysql -- \
+    #     --with-mysql-config=/usr/local/mysql/bin/mysql_config
+
+Net::SSH
+  # gem install net-ssh -v 2.0.23
+
+Ruby/LDAP
+  # gem install ruby-ldap -v 0.9.11
+
+RMagick
+  # gem install rmagick -v 2.13.1
+
+ruby-filemagic
+  # gem install ruby-filemagic -v 0.4.2
+
+shared-mime-info
+  # gem install shared-mime-info -v 0.1
+
+will_paginate
+  # gem install will_paginate -v 3.0.pre2
+
+TamTam
+  # gem install tamtam -v 0.0.3
+
+Hpricot
+  # gem install hpricot -v 0.8.3
+
+Mail
+  # gem install mail -v 2.2.6.1
+
+jpmobile
+  # gem install jpmobile -v 1.0.0.pre
+
+**********************************************************************
+  8 Joruri のインストール
+**********************************************************************
+
+Joruriユーザに変更します。
+
+  # su - joruri
+  $ cd /var/share/jorurimail
+
+======================================================================
+ 8.1 設定ファイル
+======================================================================
+
+環境に応じて設定ファイルを編集します。
+
+Joruri Mail 基本設定
+
+  $ vi config/core.yml
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  title  : Joruri Mail
+  uri    : http://192.168.0.2/
+  proxy  : ※プロキシ
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  
+  ※プロキシ
+  プロキシサーバが導入されている場合は
+  http://example:8080/ の様に記述してください。
+
+DB接続情報
+
+  $ vi config/database.yml
+
+SMTP, IMAPサーバ設定
+
+  $ vi config/environments/development.rb
+
+VirtualHost設定
+
+  $ vi config/virtual-hosts/development.conf
+
+======================================================================
+ 8.2 データベースの作成
+======================================================================
+
+データベースを作成します。
+
+  $ /usr/bin/mysql -u root -p -e "create database jorurimail"
+
+テーブルを作成します。
+
+  $ rake db:schema:load RAILS_ENV=development
+
+初期データを登録します。
+
+  $ rake db:seed RAILS_ENV=development
+
+サンプルデータを登録します。
+
+  $ rake db:seed:demo RAILS_ENV=development
+
+======================================================================
+ 8.3 VirtualHost の反映
+======================================================================
+
+Apacheに設定を追加します。
+  $ su -
+  # ln -s /var/share/jorurimail/config/virtual-hosts/development.conf \
+  #     /etc/httpd/conf.d/
+
+Apache を再起動します。
+  # /sbin/service httpd configtest
+  # /sbin/service httpd restart
+
+
+ここまでの手順で Joruri Mail にアクセスすることができます。
+
+  メーラ画面 : http://192.168.0.2/
+
+次のユーザが登録されています。
+
+    管理者（システム管理者）
+      ユーザID   : admin
+      パスワード : admin
+
+    一般ユーザ（徳島　太郎）
+      ユーザID   : user1
+      パスワード : user1
+
+    一般ユーザ（阿波　花子）
+      ユーザID   : user2
+      パスワード : user2
+
+    一般ユーザ（吉野　三郎）
+      ユーザID   : user3
+      パスワード : user3
+
+**********************************************************************
+

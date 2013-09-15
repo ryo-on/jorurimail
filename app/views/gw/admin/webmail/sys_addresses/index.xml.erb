@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<items>
+  <count><%= @users.size %></count>
+  <% if params[:search] %>
+  <total><%= @users.total_entries %></total>  
+  <% end %>
+  <% @users.each do |u| %>
+  <item>
+    <id><%= u.id %></id>
+    <account><%= u.account %></account>
+    <name><%= u.name %></name>
+    <email><%= u.email %></email>
+    <kana><%= u.kana %></kana>
+    <group_name><%= safe {u.groups.first.name} %></group_name>
+  </item>
+  <% end %>
+</items>

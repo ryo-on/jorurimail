@@ -1,0 +1,11 @@
+<% unless flash[:notice] %>
+<%= javascript_tag "window.close();" %>
+<% end %>
+<div id="mailFormContainer">
+<table id="webmailContainer"><tr><td id="webmailContent">
+<div id="mailContent" style="padding-top:10px;text-align: center;">
+
+<%= button_to '閉じる', '', :onclick => "window.close();return false;" %>
+
+</div><!-- end #webmailContainer --></td></table>
+<!-- end #mailFormContainer --></div>

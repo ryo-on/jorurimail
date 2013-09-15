@@ -1,0 +1,157 @@
+<%
+subject_wrap = @mail_list_subject.blank? ? '' : 'autoWrap'
+from_class = @mail_list_from_address.blank? ? 'from' : 'fromOmitAddress'
+%>
+<%= javascript_include_tag "/_common/js/mail_form.js" %>
+<script type="text/javascript">
+//<![CDATA[
+function checkAll(val) {
+  var frm = document.mails;
+  var len = frm.elements.length;
+  for ( var i = 0; i < len; i++) {
+    if(frm.elements[i].name.match(/^item\[ids\]/)) {
+      frm.elements[i].checked = val;
+    }
+  }
+}
+function post(action) {
+  var form = $('mails');
+  form.action = action;
+  form.submit();
+  return false;
+}
+function delete_mails() {
+  //if (confirm('削除してよろしいですか？')) post('<%= raw delete_gw_webmail_mails_path(@mailbox.name) %>');
+  post('<%= raw delete_gw_webmail_mails_path(@mailbox.name) %>');
+  return false;
+}
+function move_mails() {
+  return post('<%= raw move_gw_webmail_mails_path(@mailbox.name) %>');
+}
+function copy_mails() {
+  return post('<%= raw move_gw_webmail_mails_path(@mailbox.name, :copy => 1) %>');
+}
+function seen_mails() {
+  return post('<%= raw seen_gw_webmail_mails_path(@mailbox.name) %>');
+}
+function unseen_mails() {
+  return post('<%= raw unseen_gw_webmail_mails_path(@mailbox.name) %>');
+}
+function change_limit(limit) {
+  location.href = location.pathname + '?limit=' + limit;
+  return false;
+}
+function toggleSearchForm() {
+  $('searchForm').toggle();
+  if ($('searchForm').visible()) {
+    $('s_keyword').focus();
+  }
+  return false;
+}
+function openMail(uri, new_window) {
+  if (new_window) {
+    window.open(uri, '_blank', 'resizable=yes,scrollbars=yes,width=800');  
+  } else {
+    location.href = uri;
+  }  
+}
+//]]>
+</script>
+<table id="webmailContainer"><tr><td id="webmailMenu">
+<div id="webmailMenuContainer">
+
+<div class="menu">
+  <%= link_to 'メールの受信', gw_webmail_mails_path(@mailbox.name), :class => 'index', :title => "メールの受信" %>
+  <%= link_to 'メールの作成', new_gw_webmail_mail_path('INBOX'), :class => 'newMail', :title => "メールの作成", :target => '_blank',
+    :onclick => open_mail_form(new_gw_webmail_mail_path('INBOX')) %>
+</div>
+
+<%= render :partial => 'mailbox' %>
+
+</div>
+</td><td id="webmailContent">
+
+<div class="menu">
+  <div class="leftMenu">
+    <a href="#" onclick="return move_mails();" class="move" title="移動">移動</a
+    ><a href="#" onclick="return copy_mails();" class="copy" title="コピー">コピー</a
+    ><a href="#" onclick="return delete_mails();" class="delete" title="削除">削除</a>
+    <a href="#" onclick="return seen_mails();" class="seen" title="既読にする">既読にする</a
+    ><a href="#" onclick="return unseen_mails();" class="unseen" title="未読にする">未読にする</a>
+    <a href="#" onclick="return toggleSearchForm();" class="search" title="検索">検索</a>
+  </div>
+  <div class="simplePagination">
+    <%= link_to "≪前", url_for(@s_params.merge(:page => @items.previous_page)) if @items.previous_page
+    %><span><b><%= @items.current_page %></b>/<b><%= @items.total_pages %></b></span
+    ><%= link_to "次≫", url_for(@s_params.merge(:page => @items.next_page)) if @items.next_page
+    %><%#= paginate @items, :page_links => false, :previous_label => "≪前", :next_label => "次≫" %>
+  </div>
+</div>
+
+<%= render :partial => 'search' %>
+
+<% if @quota && @quota[:usable] %>
+<div class="quotaAlert"><%= "メールボックスの容量が、残り #{@quota[:usable]} です。" %></div>
+<% end %>
+
+<%= form_for :item, :url => '', :html => {:id => "mails", :name => "mails"} do |f| %>
+<input type="hidden" name="page" value="<%=h params[:page] %>" />
+
+<table class="mails">
+  
+  <tr>
+    <th class="check"><input type="checkbox" onclick="checkAll(this.checked)" value="0" /></th>
+    <!-- <th class="star" title="スター">☆</th> -->
+    <th class="attach" title="添付ファイル">添</th>
+    <th class="subject">件名</th>
+    <th class="<%= from_class %>"><span class="caption"><%= @mailbox.name =~ /^(Sent|Drafts)(\.|$)/ ? "受信者" : "差出人" %></span>
+      <% if params[:s_from] %>
+        <%= link_to "≪絞込解除", gw_webmail_mails_path(@mailbox.name), :class => "cancelFromSearch" %>
+      <% end %>
+    </th>
+    <th class="date">送信日時</th>
+    <th class="size">サイズ</th>
+  </tr>
+  
+  <script type="text/javascript" src="/_common/js/dump.js"></script>
+  
+  <% for item in @items
+  flag  = (item.answered?) ? "answered" : ""
+  flag += "forwarded" if item.forwarded?
+  mdnRequest = item.has_disposition_notification_to? ? 'mdnRequest' : ''
+  uri = url_for(:action => :show, :id => item.uid, :new_window => (@mail_open_window.blank? ? nil : 1))
+  click = %Q[onclick="openMail('#{uri}', #{!@mail_open_window.blank?}); return false;"].html_safe
+  from_tooltip = value = truncate(item.subject, :length => 70)
+  s_from = from = item.friendly_from_addr
+  if @mailbox.name =~ /^(Sent|Drafts)(\.|$)/
+    from = item.simple_to_addr
+    s_from = item.friendly_to_addrs[0] || ''
+  end 
+  from, from_tooltip = omit_from_address_in_mail_list(from) unless @mail_list_from_address.blank?
+  value = ' ' if value.blank? 
+  %>
+  <tr class="<%= 'unseen' if item.unseen? %> <%= cycle '', 'cycle' %>">
+    <td class="check"><input type="checkbox" name="item[ids][<%= item.uid %>]" value="1" /></td>
+    <td class="attach"><%=raw %Q(<span class="attach" title="添付ファイル">有</span>) if item.has_attachments? %></td>
+    <td class="subject <%= flag %> <%= mdnRequest %> <%= subject_wrap %>" <%= click %>><span class="overflowHidden <%= subject_wrap %>" title="<%= item.subject %>">
+      <%= link_to mail_text_wrap(value), url_for(:action => :show, :id => item.uid) %></span></td>
+    <td class="from"><span class="overflowHidden" title="<%= from_tooltip %>">
+      <%= link_to mail_text_wrap(from), url_for(:s_from => s_from) %></span></td>
+    <td class="date" <%= click %>>
+      <%=h item.date %></td>
+    <td class="size" <%= click %>>
+      <%=h number_format(item.size) %></td>
+  </tr>
+  <% end %>
+
+</table>
+
+<% end %>
+
+<%= paginate @items %>
+
+<% if @quota %>
+<div class="quota"><%= "現在 #{@quota[:total]} 中 #{@quota[:used]} (#{@quota[:usage_rate]}%) 使用しています。" %></div>
+<% end %>
+
+<!-- end #webmailContainer --></td></table>

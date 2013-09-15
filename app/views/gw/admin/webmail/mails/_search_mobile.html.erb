@@ -1,0 +1,24 @@
+<%
+
+kopts = [["件名（Subject）","subject"],["差出人（From）","from"],["宛先（To）","to"],["本文（Body）","body"],["全文","text"]]
+sopts = [["すべて",""],["未読のみ","unseen"],["既読のみ","seen"]]
+disp  = params[:search] ? "block" : "none"
+
+%>
+
+<%= form_tag '', :method => :get, :id => 'searchForm', :class => 'searchForm' do %>
+  <%= hidden_field_tag :search, 1 %>
+  <div class="option">
+    <div class="subTitle">キーワード</div>
+    <%= text_field_tag 's_keyword', params[:s_keyword], :class => 'keyword', :istyle => '1', :format => '*M', :mode => 'hiragana' %>
+    <%= select_tag('s_column', options_for_select(kopts, params[:s_column])) %>
+  </div>
+  <div class="option">
+    <div class="subTitle">状態</div>
+    <%= select_tag('s_status', options_for_select(sopts, params[:s_status])) %>
+  </div>
+  <div class="submitters">
+    <%= submit_tag '検索', :name => :search %>
+    <%= submit_tag 'リセット', :name => :reset %>
+  </div>
+<% end %>
