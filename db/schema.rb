@@ -372,6 +372,16 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
 
   add_index "gw_webmail_addresses", ["user_id", "group_id"], :name => "user_id"
 
+  create_table "gw_webmail_docs", :force => true do |t|
+    t.string   "state",        :limit => 15
+    t.integer  "sort_no"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+    t.datetime "published_at"
+    t.text     "title"
+    t.text     "body"
+  end
+
   create_table "gw_webmail_filter_conditions", :force => true do |t|
     t.integer  "user_id"
     t.integer  "filter_id"
@@ -399,6 +409,16 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
 
   add_index "gw_webmail_filters", ["user_id"], :name => "user_id"
 
+  create_table "gw_webmail_mail_address_histories", :force => true do |t|
+    t.integer  "user_id"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+    t.string   "address"
+    t.string   "friendly_address"
+  end
+
+  add_index "gw_webmail_mail_address_histories", ["user_id"], :name => "user_id"
+
   create_table "gw_webmail_mail_nodes", :force => true do |t|
     t.integer  "user_id"
     t.integer  "uid"
@@ -414,6 +434,8 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
     t.boolean  "has_attachments"
     t.integer  "size"
     t.boolean  "has_disposition_notification_to"
+    t.integer  "ref_uid"
+    t.text     "ref_mailbox"
   end
 
   add_index "gw_webmail_mail_nodes", ["user_id", "uid", "mailbox"], :name => "user_id", :length => {"user_id"=>nil, "uid"=>nil, "mailbox"=>"16"}
@@ -542,14 +564,16 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
     t.integer  "parent_id"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.string   "version",    :limit => 10
-    t.string   "entry_type", :limit => 15
+    t.string   "version",           :limit => 10
+    t.string   "entry_type",        :limit => 15
     t.string   "code"
-    t.integer  "sort_no"
     t.string   "name"
     t.string   "name_en"
     t.string   "email"
     t.string   "kana"
+    t.string   "sort_no"
+    t.string   "official_position"
+    t.string   "assigned_job"
   end
 
   add_index "sys_ldap_synchros", ["version", "parent_id", "entry_type"], :name => "version"
@@ -645,7 +669,7 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
   add_index "sys_user_logins", ["user_id"], :name => "user_id"
 
   create_table "sys_users", :force => true do |t|
-    t.string   "air_login_id"
+    t.text     "air_login_id"
     t.string   "state",                     :limit => 15
     t.datetime "created_at"
     t.datetime "updated_at"
@@ -662,6 +686,9 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
     t.text     "remember_token"
     t.datetime "remember_token_expires_at"
     t.string   "kana"
+    t.string   "sort_no"
+    t.string   "official_position"
+    t.string   "assigned_job"
   end
 
   create_table "sys_users_groups", :id => false, :force => true do |t|

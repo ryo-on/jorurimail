@@ -10,8 +10,8 @@ Joruri::Application.routes.draw do
           :controller => "webmail/mails",
           :path => "webmail/*mailbox/mails" do
             collection do
-              get :empty, :close
-              post :move, :delete, :seen, :unseen, :mobile_manage
+              get :empty, :close, :reset_address_history, :star
+              post :move, :delete, :seen, :unseen, :register_spam, :mobile_manage, :status
             end
             member do
               get :edit, :answer, :forward, :resend
@@ -95,6 +95,9 @@ Joruri::Application.routes.draw do
         resources "webmail_settings",
           :controller => "webmail/settings",
           :path => "webmail/:category/settings"
+        resources "webmail_docs",
+          :controller => "webmail/docs",
+          :path => "webmail/docs"
       end
     end
   end
@@ -113,5 +116,6 @@ Joruri::Application.routes.draw do
   match "_admin/#{mod}/webmail_mobile_users(.:format)" => "#{mod}/admin/webmail/mobile#users"
   
   match "_api/#{mod}/webmail/unseen(.:format)" => "#{mod}/admin/webmail/api#unseen"
+  match "_api/#{mod}/webmail/recent(.:format)" => "#{mod}/admin/webmail/api#recent"
   
 end

@@ -50,7 +50,7 @@ end
 
 %>
 
-<div class="groups"><%= Application.menu(:address_group_menu) %></div>
+<div class="groups"><%= Joruri.config.application['webmail.address_group_menu'] %></div>
 <%= form_tag gw_webmail_address_groups_path, {:id => 'groupForm', :name => 'groupForm', :class => 'groupForm', :method => :get } do |f| %>
   <%= select_tag :group_id, options_for_select(group_selection_root(@root_groups), @group.id), :class => 'selectUI' %><br/>
   <%= submit_tag '検索', :class => 'menuItem', :name => 'select', :accesskey => '1' %>

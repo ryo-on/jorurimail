@@ -6,8 +6,8 @@ class Gw::Admin::Webmail::FiltersController < Gw::Controller::Admin::Base
   def pre_dispatch
     imap = Core.imap
     #return error_auth unless Core.user.has_auth?(:designer)
-  rescue => e
-    render :text => %Q(<div class="railsException">#{e}</div>), :layout => true
+  #rescue => e
+    #render :text => %Q(<div class="railsException">#{e}</div>), :layout => true
   end
   
   def index
@@ -61,24 +61,35 @@ class Gw::Admin::Webmail::FiltersController < Gw::Controller::Admin::Base
     return false unless request.post?
     
     ## validation
-    @f_item.errors.add_to_base "適用するフォルダを入力してください。" if @f_item.mailbox.blank?
-    @f_item.errors.add_to_base "適用する条件が見つかりません。" if @item.conditions.size == 0
+    @f_item.errors.add :base, "適用するフォルダを入力してください。" if @f_item.mailbox.blank?
+    @f_item.errors.add :base, "適用する条件が見つかりません。" if @item.conditions.size == 0
     return false if @f_item.errors.size > 0
     
     @applied = 0
     message  = ""
+    changed_mailbox_uids = {}
     
     begin
       timeout = Sys::Lib::Timeout.new(60)
       if @f_item.include_sub == "1"
         mailboxes = Core.imap.list('', "#{@f_item.mailbox}.*") || []
-        mailboxes.each {|mailbox| apply_mailbox(mailbox.name, timeout) }
+        mailboxes.each do |mailbox|
+          apply_mailbox(mailbox.name, timeout)
+        end
       end
       apply_mailbox(@f_item.mailbox, timeout)
     rescue Sys::Lib::Timeout::Error => ex 
       message = "タイムアウトしました。（#{ex.second}秒）<br />"
     end
     
+    case @item.action
+    when 'move'
+      changed_mailbox_uids[@item.mailbox] = [:all]
+    when 'delete'
+      changed_mailbox_uids['Trash'] = [:all]
+    end
+    
+    Gw::WebmailMailbox.load_starred_mails(changed_mailbox_uids) if @applied > 0
     Gw::WebmailMailbox.load_mailboxes(reload = true) if @applied > 0
     flash[:notice] = "#{message}#{@applied}件のメールに適用しました。".html_safe
     redirect_to :action => :apply

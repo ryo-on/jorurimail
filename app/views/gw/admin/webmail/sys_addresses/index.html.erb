@@ -123,9 +123,11 @@ function showAddresses(request) {
   html += '<th class="checkUI"><a onmousedown="checkAll(\'to\' , \'' + gid + '\');" onclick="return false;" href="#" title="TO">TO</a></th>';
   html += '<th class="checkUI"><a onmousedown="checkAll(\'cc\' , \'' + gid + '\');" onclick="return false;" href="#" title="CC">CC</a></th>';
   html += '<th class="checkUI"><a onmousedown="checkAll(\'bcc\', \'' + gid + '\');" onclick="return false;" href="#" title="BCC">BCC</a></th>';
-  html += '<th style="width: 30%;"><a id="nameCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'name\'); return false;">名前</a></th>';
-  html += '<th style="width: 20%;"><a id="kanaCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'kana\'); return false;">フリガナ</a></th>';
-  html += '<th style="width: ;"><a id="emailCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'email\'); return false;">メールアドレス</a></th>';
+  html += '<th style="width: 18%;"><a class="sorter" id="nameCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'name\'); return false;">名前</a></th>';
+  html += '<th style="width: 18%;"><a class="sorter" id="kanaCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'kana\'); return false;">フリガナ</a></th>';
+  html += '<th style="display: none;"><a class="sorter" id="sortNoCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'sortNo\'); return false;">役職(担当順)</a></th>';
+  html += '<th style="width: 15%;"><a class="sorter" id="officialPositionCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'sortNo\'); return false;">役職(担当順)</a></th>';
+  html += '<th style="width: ;"><a class="sorter" id="emailCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'email\'); return false;">メールアドレス</a></th>';
   html += '</tr>';
 
   var all_escape = function (str) {
@@ -140,17 +142,22 @@ function showAddresses(request) {
     var name  = getNodeValue(item, 'name');
     var email = getNodeValue(item, 'email');
     var kana  = getNodeValue(item, 'kana');
+    var sortNo = getNodeValue(item, 'sort_no');
+    var officialPosition = getNodeValue(item, 'official_position');
     var groupName = getNodeValue(item, 'group_name');
     var nameView = name;
     if (groupName != null) nameView += " （" + groupName + "）";
-    var kanaView = kana;
-    if (kanaView == null) kanaView = "";
+    if (kana == null) kana = "";
+    if (sortNo == null) sortNo = "";
+    if (officialPosition == null) officialPosition = "";
     html += '<tr>';
     html += '<td class="checkUI"><input type="checkbox" name="to[' + id + ']"  value="1" class="group' + gid + '" /></td>';
     html += '<td class="checkUI"><input type="checkbox" name="cc[' + id + ']"  value="1" class="group' + gid + '" /></td>';
     html += '<td class="checkUI"><input type="checkbox" name="bcc[' + id + ']" value="1" class="group' + gid + '" /></td>';
     html += '<td><a id="nameValue" href="#" onclick="showAddress(\'' + id + '\');return true;">' + nameView.escapeHTML() + '</a></td>';
-    html += '<td id="kanaValue">' + kanaView.escapeHTML() + '</td>';
+    html += '<td id="kanaValue">' + kana.escapeHTML() + '</td>';
+    html += '<td id="sortNoValue" style="display: none;">' + sortNo.escapeHTML() + '</td>';
+    html += '<td id="officialPositionValue">' + officialPosition.escapeHTML() + '</td>';
     html += "<td id=\"emailValue\">" + email.escapeHTML();
     html += "<a class=\"addAddress\" title=\"個人アドレス帳に登録する\" href=\"#top\" "
     html += "onclick=\"addAddress('" + all_escape(email) + "', '"  + all_escape(name) + "', '" + all_escape(kana) + "');return false;\">"
@@ -365,19 +372,35 @@ function nextSortOrder(titleText) {
   if (titleText.match(/▲/)) mark = "▼";
   return mark;
 }
+function initSortMark(node) {
+  node.innerHTML = node.innerHTML.replace("▲","").replace("▼","");
+}
 function setNextSortOrder(gid, key) {
   var keyNode = $(key + 'Caption' + gid);
   var nameNode = $('nameCaption' + gid);
   var kanaNode = $('kanaCaption' + gid);
+  var sortNoNode = $('sortNoCaption' + gid);
+  var officialPositionNode = $('officialPositionCaption' + gid);
   var emailNode = $('emailCaption' + gid);
   var order = "▲";
-  if (!nameNode || !kanaNode || !emailNode || !keyNode) return order;
-  order = nextSortOrder(keyNode.innerText);
-  nameNode.innerText = nameNode.innerText.replace("▲","").replace("▼","");
-  kanaNode.innerText = kanaNode.innerText.replace("▲","").replace("▼","");
-  emailNode.innerText = emailNode.innerText.replace("▲","").replace("▼","");
-  keyNode.innerText += order;
+  if (!nameNode || !kanaNode || !sortNoNode || !officialPositionNode || !emailNode || !keyNode) return order;
+  order = nextSortOrder(keyNode.innerHTML);
+  initSortMark(nameNode);
+  initSortMark(kanaNode);
+  initSortMark(sortNoNode);
+  initSortMark(officialPositionNode);
+  initSortMark(emailNode);
+  keyNode.innerHTML += order;
+  if (keyNode == sortNoNode) {
+    officialPositionNode.innerHTML += order;
+  } 
   return order;
+}
+function getInnerText(elm) {
+  if ('textContent' in  elm) {
+    return elm.textContent;
+  }
+  return elm.innerText;
 }
 function sortAddresses(gid, key) {
   var tbodyNode = getTbodyNode(gid);
@@ -389,12 +412,14 @@ function sortAddresses(gid, key) {
   while (trNodes.length > 1) {
     var node = trNodes[1];
     var children = node.getElementsByTagName('td');
-    if (children.length >= 6) {
+    if (children.length >= 7) {
       var hash = new Hash();
       hash.node = node;
-      hash.name = children[3].innerText;
-      hash.kana = children[4].innerText;
-      hash.email = children[5].innerText;
+      hash.name = getInnerText(children[3]);
+      hash.kana = getInnerText(children[4]);
+      hash.sortNo = getInnerText(children[5]);
+      hash.officialPosition = getInnerText(children[6]);
+      hash.email = getInnerText(children[7]);
       clones.push(hash);
     }
     node.parentNode.removeChild(node);

@@ -4,7 +4,7 @@ mailboxes = []
 Gw::WebmailMailbox.load_mailboxes.each do |box|
   next if box.name == @mailbox.name && params[:copy].blank?
   #next if box.name =~ /^(Drafts|Sent|Trash)(\.|$)/
-  next if box.name =~ /^(Drafts|Trash)(\.|$)/
+  next if box.name =~ /^(Drafts|Trash|Star)(\.|$)/
   mailboxes << [box.slashed_title, "#{box.name}"]
 end
 
@@ -23,6 +23,7 @@ action_label = params[:copy].blank? ? '移動' : 'コピー'
 </div>
 
 <%= render :partial => 'mailbox' %>
+<%= render :partial => 'mail_address_history' if @mail_address_history != 0 %>
 
 </div></td>
 <% end %>

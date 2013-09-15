@@ -74,7 +74,8 @@ h1 a:visited:hover {
   line-height:20px;
 }
 #container .mailbox,
-#container .sendMenu .menus{
+#container .sendMenu .menus,
+#container .linkMenu .menus{
   margin-left:15px;
 }
 .children{
@@ -123,7 +124,8 @@ h1 a:visited:hover {
   margin-top:5px;
   padding:3px 5px;
 }
-.sendMenu .title{
+.sendMenu .title,
+.linkMenu .title{
   background-color:#E8F5FF;
   margin-bottom:5px;
   margin-top:5px;
@@ -175,7 +177,10 @@ h1 a:visited:hover {
   border-bottom-style:dotted;
   border-bottom-width:1px;
 }
-.mailItems .mailItem .date{
+.mailItems .mailItem .date {
+  margin-left:9px;
+}
+.mailItems .mailItem .mailbox {
   margin-left:9px;
 }
 .mailItems .mailItem .unseen .subject {
@@ -385,6 +390,9 @@ h2 a:visited:hover {
 /* エラーメッセージ */
 .notice {
   color:green;
+}
+.error {
+  color:red;
 }
 
 /* smartPhone */

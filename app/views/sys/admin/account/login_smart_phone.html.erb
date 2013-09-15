@@ -3,6 +3,7 @@
 <head>
 <meta http-equiv="content-type" content="text/html;charset=<%= request.mobile.default_charset %>" />
 <meta http-equiv="content-style-type" content="text/css" />
+<meta content="width=device-width,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" name="viewport" />
 <title><%= Core.title %></title>
 <%= stylesheet_link_tag '/_common/themes/admin/gw/webmail/mobile/style', :media => 'all' %>
 </head>
@@ -29,7 +30,7 @@
   <% end %>
 </div>
 
-<div class="copyright">Powered by Joruri</div>
+<%=raw Joruri.config.application['sys.mobile_footer'] %>
 
 </div>
 

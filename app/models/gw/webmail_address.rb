@@ -63,26 +63,29 @@ class Gw::WebmailAddress < ActiveRecord::Base
       s.gsub(/[\\%_]/) {|r| "\\#{r}"}
     end
     
-    params.each do |k, v|
-      next if v.blank?
+    params.each do |k, vs|
+      next if vs.blank?
       
-      case k  
-      when 's_group_id'
-        if v == NO_GROUP
-          self.and :group_id, 'IS', nil
-        else
-          self.and :group_id, v
-        end  
-      when 's_name'
-        self.and :name, 'LIKE', "%#{like_param.call(v)}%"
-      when 's_email'
-        self.and :email, 'LIKE', "%#{like_param.call(v)}%"
-      when 's_name_or_kana'
-        kana_v = v.to_s.tr("ぁ-ん", "ァ-ン")
-        cond = Condition.new
-        cond.or :name, 'LIKE', "%#{like_param.call(v)}%"
-        cond.or :kana, 'LIKE', "%#{like_param.call(kana_v)}%"
-        self.and cond
+      vs.split(/[ 　]+/).each do |v|
+        next if v == ''
+        case k
+        when 's_group_id'
+          if v == NO_GROUP
+            self.and :group_id, 'IS', nil
+          else
+            self.and :group_id, v
+          end  
+        when 's_name'
+          self.and :name, 'LIKE', "%#{like_param.call(v)}%"
+        when 's_email'
+          self.and :email, 'LIKE', "%#{like_param.call(v)}%"
+        when 's_name_or_kana'
+          kana_v = v.to_s.tr("ぁ-ん", "ァ-ン")
+          cond = Condition.new
+          cond.or :name, 'LIKE', "%#{like_param.call(v)}%"
+          cond.or :kana, 'LIKE', "%#{like_param.call(kana_v)}%"
+          self.and cond
+        end
       end
     end
   end

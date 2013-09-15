@@ -139,7 +139,7 @@ module Jpmobile::Mobile
   end
 end
 
-if Application.config(:force_mobile_site) == 1
+if Joruri.config.application['sys.force_mobile_site'] == 1
   module Jpmobile::Mobile
     class Others < SmartPhone
       USER_AGENT_REGEXP = /./

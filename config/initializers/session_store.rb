@@ -8,3 +8,4 @@ Joruri::Application.config.session_store :cookie_store, :key => '_joruri_session
 Joruri::Application.config.session_store :active_record_store
 Joruri::Application.config.session_options = {:cookie_only => false}
 ActiveRecord::SessionStore::Session.establish_connection :session rescue nil
+ActiveRecord::SessionStore::Session.validates_presence_of :session_id

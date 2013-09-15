@@ -1,9 +1,10 @@
-<div class="link">
 <% if params[:mobile].blank? || params[:mobile] != 'top' %>
-<%= link_to 'トップページへ', gw_webmail_mails_path(:mailbox => 'INBOX', :mobile => :top), :accesskey => "0" %>&nbsp;
-<% end %>
-<a class="logout" href="/_admin/logout">ログアウト</a>
+<div class="linkTop">
+  <%= link_to image_tag('/_common/themes/admin/gw/webmail/mobile/images/smartphone/ic/ic-top.gif'), gw_webmail_mails_path(:mailbox => 'INBOX', :mobile => :top) %><br />
+  <%= link_to 'トップ', gw_webmail_mails_path(:mailbox => 'INBOX', :mobile => :top) %>
 </div>
-<br />
-<br />
-<%=raw Application.config(:mobile_footer, "") %>
+<% end %>
+<div class="personal">
+  前回ログイン日時　<%= safe{Core.user.previous_login_date} ? safe{Core.user.previous_login_date.strftime('%Y-%m-%d %H:%M')} : '---'%>
+</div>
+<div class="logout"><a href="/_admin/logout">&gt;ログアウト</a></div>

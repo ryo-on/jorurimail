@@ -4,6 +4,11 @@ kopts = [["件名（Subject）","subject"],["差出人（From）","from"],["宛�
 sopts = [["すべて",""],["未読のみ","unseen"],["既読のみ","seen"]]
 disp  = params[:search] ? "block" : "none"
 
+fromto = @mailbox.name =~ /^(Sent|Drafts)(\.|$)/ ? ["受信者","to"] : ["差出人","from"]
+skopts = [["件名","subject"],fromto,["送信日時","date"],["サイズ","size"]]
+soopts = [["昇順",""],["降順","reverse"]]
+ssopts = [["",""],["スター付き優先","1"]]
+
 %>
 
 <%= form_tag '', :method => :get, :id => 'searchForm', :class => 'searchForm' do %>
@@ -17,6 +22,13 @@ disp  = params[:search] ? "block" : "none"
     <div class="subTitle">状態</div>
     <%= select_tag('s_status', options_for_select(sopts, params[:s_status])) %>
   </div>
+  <div class="option">
+    <div class="subTitle">並び順</div>
+    <%= select_tag('sort_key', options_for_select(skopts, params[:sort_key])) %>
+    <%= select_tag('sort_order', options_for_select(soopts, params[:sort_order])) %>
+    <%= select_tag('sort_starred', options_for_select(ssopts, params[:sort_starred])) %>
+  </div>
+  </tr>
   <div class="submitters">
     <%= submit_tag '検索', :name => :search %>
     <%= submit_tag 'リセット', :name => :reset %>

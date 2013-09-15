@@ -82,6 +82,13 @@
   color: #777;
   float: right;
 }
+#addressContent #addresses table a.sorter {
+  /*color: #000;*/
+  text-decoration: underline;
+}
+#addressContent #addresses table a.sorter:hover {
+  /*color: #00f;*/
+}
 #addressContent #addresses .limitedMessage {
   float: right;
 }

@@ -39,7 +39,11 @@ Joruri::Application.routes.draw do
           :path => "users"
         resources "groups",
           :controller => "groups",
-          :path => ":parent/groups"
+          :path => ":parent/groups" do
+            collection do
+              get :assign_sort_no
+            end
+          end
         resources "group_users",
           :controller => "group_users",
           :path => ":parent/group_users"
@@ -76,6 +80,9 @@ Joruri::Application.routes.draw do
               get :download
             end
           end
+        resources "docs",
+          :controller => "docs",
+          :path => "docs"
         match ":parent/inline_files/files/(:name(.:format))" => "inline/files#download"
       end
     end

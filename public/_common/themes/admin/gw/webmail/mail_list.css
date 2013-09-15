@@ -17,10 +17,13 @@
   background-color: #bdf;
   text-align: left;
 }
-#webmailContent table.mails th.check   { width: 30px; padding: 0px; border: none; text-align: center; }
-#webmailContent table.mails th.star    { width: 20px; text-align: center; }
+#webmailContent table.mails th.drag    { width: 4px; }
+#webmailContent table.mails th.check   { width: 26px; padding: 0px; border: none; text-align: center; }
+#webmailContent table.mails th.starOn  { width: 20px; text-align: center; }
+#webmailContent table.mails th.starOff { width: 20px; text-align: center; }
 #webmailContent table.mails th.attach  { width: 20px; padding: 0px 2px; text-align: center; }
 #webmailContent table.mails th.subject { width: ; }
+#webmailContent table.mails th.mailbox { width: 60px; border: none; }
 #webmailContent table.mails th.from    { width: 30%; }
 #webmailContent table.mails th.fromOmitAddress { width: 20%; }
 #webmailContent table.mails th.date    { width: 9em; }
@@ -40,6 +43,13 @@
   float: right;
   color: #00B;
   text-decoration: none;
+}
+#webmailContent table.mails a.sorter {
+  color: #000;
+  text-decoration: none;
+}
+#webmailContent table.mails a.sorter:hover {
+  color: #00f;
 }
 
 #webmailContent table.mails td {
@@ -68,7 +78,8 @@
   font-weight: bold;
 }
 #webmailContent table.mails td.check   { padding: 0px; text-align: center; }
-#webmailContent table.mails td.star    { color: #f70; text-align: center; }
+#webmailContent table.mails td.starOn  { color: #f70; text-align: center; }
+#webmailContent table.mails td.starOff { color: #f70; text-align: center; }
 #webmailContent table.mails td.attach {
   color: #0b0;
   text-align: center;
@@ -85,25 +96,37 @@
   background-repeat: no-repeat;
   overflow: hidden;
 }
-#webmailContent table.mails th.star,
-#webmailContent table.mails td.star {
+#webmailContent table.mails th.starOn,
+#webmailContent table.mails td.starOn {
+  background-image: url(../images/mailoption/star_on.gif);
+  background-repeat: no-repeat;
+  background-position: center center;
+  text-indent: -9999px;
+  cursor: pointer;
+}
+#webmailContent table.mails th.starOn:hover {
+  background-image: url(../images/mailoption/star_off.gif);
+}
+#webmailContent table.mails th.starOff,
+#webmailContent table.mails td.starOff {
   background-image: url(../images/mailoption/star_off.gif);
   background-repeat: no-repeat;
   background-position: center center;
-}
-#webmailContent table.mails th.star {
   text-indent: -9999px;
+  cursor: pointer;
 }
-#webmailContent table.mails td.star span.start {
-  display: inline-block;
-  height: 0;
-  padding-top: 11px;
+#webmailContent table.mails th.starOff:hover {
   background-image: url(../images/mailoption/star_on.gif);
+}
+#webmailContent table.mails td.loading {
+  background-image: url(../images/other/loading_16.gif);
   background-repeat: no-repeat;
-  background-position: center 0;
-  overflow: hidden;
+  background-position: center center;
 }
 #webmailContent table.mails td.subject {
+  cursor: pointer;
+}
+#webmailContent table.mails td.mailbox {
   cursor: pointer;
 }
 #webmailContent table.mails td.from {
@@ -156,6 +179,25 @@
 #webmailContent table.mails tr.unseen td.mdnRequest a {
   background-image: url(../images/mailoption/mdn_request.gif);
   background-position: 0 0.2em;
+}
+#webmailContent table.mails td.drag {
+  cursor: move;
+  background-image: url(../images/ic_mail_drag.gif);
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+#webmailContent table.mails td.ui-draggable-dragging {
+  height: auto;
+  padding: 0px 0px 0px 4px;
+  border-bottom: 1px solid #ddd;
+  background-color: #fff;
+  line-height: auto;
+}
+#webmailContent table.mails td.ui-draggable-dragging span {
+  display: block;
+  overflow: hidden;
+  height: 1.65em;
+  background-color: #fff;
 }
 #webmailContent .quota {
   margin-top: 15px;

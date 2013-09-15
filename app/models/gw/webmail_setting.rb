@@ -22,14 +22,14 @@ class Gw::WebmailSetting < ActiveRecord::Base
     ['メール一覧', :mail_list],
     ['メール読み取り', :mail_detail] ,
     ['メール送信', :mail_form] ,
-    [Application.menu(:sys_address_menu), :sys_address],
-    [Application.menu(:address_group_menu), :address],
+    [Joruri.config.application['webmail.sys_address_menu'], :sys_address],
+    [Joruri.config.application['webmail.address_group_menu'], :address],
     ['携帯端末', :mobile]  
   ]
 
   @@config_categorizing = {
-    :mail_list => [:mails_per_page, :mail_list_subject, :mail_list_from_address],
-    :mail_detail => [:html_mail_view],
+    :mail_list => [:mails_per_page, :mail_list_subject, :mail_list_from_address, :mail_address_history],
+    :mail_detail => [:mail_open_window, :html_mail_view, :mail_attachment_view],
     :mail_form => [:mail_from, :mail_form_size, :sign_position],
     :sys_address => [:sys_address_order],
     :address => [:address_order],
@@ -40,8 +40,10 @@ class Gw::WebmailSetting < ActiveRecord::Base
     :mails_per_page => 'メール表示件数',
     :mail_list_subject => '件名',
     :mail_list_from_address => '差出人のメールアドレス',
+    :mail_address_history => 'クイックアドレス帳',
     :html_mail_view => 'HTMLメールの表示',
-    :mail_open_window => 'メールを開くウィンドウ',
+    :mail_attachment_view => '添付ファイルの表示',
+    :mail_open_window => 'メールの表示方法',
     :mail_from => 'メール送信者名',
     :mail_form_size => 'ウィンドウサイズ',
     :sign_position => '署名の位置（返信・転送時）',
@@ -55,7 +57,9 @@ class Gw::WebmailSetting < ActiveRecord::Base
     :mails_per_page => :select,
     :mail_list_subject => :select,
     :mail_list_from_address => :select,
+    :mail_address_history => :select,
     :html_mail_view => :select,
+    :mail_attachment_view => :select,
     :mail_open_window => :select,
     :mail_from => :select,
     :mail_form_size => :select,
@@ -70,12 +74,14 @@ class Gw::WebmailSetting < ActiveRecord::Base
     :mails_per_page => [['20件（標準）',''],['30件','30'],['40件','40'],['50件','50']],
     :mail_list_subject => [['１行で表示（標準）', ''], ['折り返して表示', 'wrap']],
     :mail_list_from_address => [['表示する（標準）', ''], ['表示しない', 'omit_address']],
-    :html_mail_view => [['HTML形式で表示（標準）', ''], ['テキスト形式で表示', 'text']],
-    :mail_open_window => [['同じウィンドウ（標準）', ''], ['別のウィンドウ', 'new_window']],
+    :mail_address_history => [['表示しない', '0'], ['5件表示', '5'], ['10件表示（標準）', ''], ['15件表示', '15'], ['20件表示', '20']],
+    :html_mail_view => [['HTML形式で表示する（標準）', ''], ['テキスト形式で表示する', 'text']],
+    :mail_attachment_view => [['画像をサムネイル形式で表示する（標準）', ''], ['一覧形式で表示する', 'list']],
+    :mail_open_window => [['同じウィンドウで開く（標準）', ''], ['新しいウィンドウで開く', 'new_window']],
     :mail_from => [['氏名（標準）',''],['メールアドレスのみ','only_address']],
     :mail_form_size => [['小','small'],['中（標準）',''],['大','large']],
     :sign_position => [['引用文の前（標準）', ''], ['引用文の後', 'bottom']],
-    :sys_address_order => [['メールアドレス（標準）', ''], ['フリガナ', 'kana'], ['名前', 'name']],
+    :sys_address_order => [['メールアドレス（標準）', ''], ['名前', 'name'], ['フリガナ', 'kana'], ['役職（担当順）', 'sort_no']],
     :address_order => [['メールアドレス（標準）', ''], ['フリガナ', 'kana'], ['並び順指定', 'sort_no']],
     :mobile_access => [['不許可（標準）', '0'], ['許可', '1']]
   }
@@ -189,7 +195,8 @@ class Gw::WebmailSetting < ActiveRecord::Base
   def save(*args)
     case name.intern
     when :mobile_access, :mobile_password
-      return Gw::WebmailSetting.save_mobile_setting_for_user(Core.user, self)
+      user = Sys::User.find_by_id(Core.user.id)
+      return Gw::WebmailSetting.save_mobile_setting_for_user(user, self)
     end
     super(*args)
   end

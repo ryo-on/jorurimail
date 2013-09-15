@@ -20,6 +20,10 @@ class ApplicationController < ActionController::Base
     self.class.layout 'base'
   end
   
+  def query(params = nil)
+    Util::Http::QueryString.get_query(params)
+  end
+  
   def send_mail(mail_fr, mail_to, subject, message)
     return false if mail_fr.blank?
     return false if mail_to.blank?
@@ -38,7 +42,7 @@ class ApplicationController < ActionController::Base
 ###  end
   
   def inline_css_for_mobile
-    if request.mobile?
+    if request.mobile? && !request.smart_phone?
       begin
         require 'tamtam'
         response.body = TamTam.inline(
@@ -130,7 +134,8 @@ private
     
     ## errors.log
     if status != 404
-      error_log("#{status} #{request.env['REQUEST_URI']} #{message.to_s.gsub(/\n/, ' ')}")
+      request_uri = request.fullpath.force_encoding('UTF-8')
+      error_log("#{status} #{request_uri} #{message.to_s.gsub(/\n/, ' ')}")
     end
     
     ## Render

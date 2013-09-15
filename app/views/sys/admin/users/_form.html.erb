@@ -18,6 +18,15 @@
     <th><%= @item.locale(:email) %></th>
     <td><%= f.text_field :email, :class => 'email' %></td>
   </tr><tr>
+    <th><%= @item.locale(:sort_no) %></th>
+    <td><%= f.text_field :sort_no, :class => 'name' %></td>
+  </tr><tr>
+    <th><%= @item.locale(:official_position) %></th>
+    <td><%= f.text_field :official_position, :class => 'name' %></td>
+  </tr><tr>
+    <th><%= @item.locale(:assigned_job) %></th>
+    <td><%= f.text_field :assigned_job, :class => 'name' %></td>
+  </tr><tr>
     <th><%= @item.locale(:state) %></th>
     <td><%= f.radio_buttons :state, @item.states, :class => 'status' %></td>
   </tr><tr>

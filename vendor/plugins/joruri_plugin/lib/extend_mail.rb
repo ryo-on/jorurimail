@@ -57,33 +57,6 @@ end
 
 Mail::Message.class_eval do
   def find_attachment
-    #if content_type && header[:content_disposition]
-    #  if header[:content_disposition].value =~ /filename=/
-    #    filename = unquote(header[:content_disposition].value.gsub(/.*filename=(.*?)(;.*|$)/, '\\1')).strip
-    #    filename = ::NKF::nkf('-wx--cp932', filename)
-    #    filename = filename.gsub(/^"(.*)"$/, '\\1')
-    #    return filename
-    #  end
-    #end
-    
-    if header[:content_type]
-      ct_value = header[:content_type].value
-      if mt = ct_value.match(/;\s*name=(.*?)(;|$)/im)
-        if mt[1].strip[0] != '"'
-          header[:content_type].value = ct_value[0, mt.begin(1)] + '"' + mt[1].strip + '"' + ct_value[mt.end(1), ct_value.size]
-        end
-      end
-    end
-    if header[:content_disposition]
-      accept_encoding = 'iso-2022-jp|shift_jis|euc-jp|utf-8'
-      cd_value = header[:content_disposition].value
-      if mt = cd_value.match(/;\s*filename\*(?:0\*?)?=(?:#{accept_encoding})'(.*?)'/im)
-        if mt[1].blank?
-          header[:content_disposition].value = cd_value[0, mt.begin(1)] + 'ja' + cd_value[mt.end(1), cd_value.size]
-        end
-      end
-    end
-    
     case
     when content_type && header[:content_type].filename
       filename = header[:content_type].filename
@@ -108,60 +81,176 @@ Mail::Message.class_eval do
     error_log(e)
     nil
   end
+  
+  def boundary
+    content_type_parameters ? 
+      content_type_parameters['boundary'] || 
+      content_type_parameters['Boundary'] || 
+      content_type_parameters['BOUNDARY'] : nil
+  end
 end
 
-Mail::FieldList.class_eval do
-  
-  alias :_add_new_field_backed_up_by_joruri :<<
-  
-  def <<(new_field)
-    if new_field.field.is_a?(Mail::UnstructuredField) && new_field.errors.size > 0
-      case new_field.name.downcase.to_s
-      when 'content-disposition'
-        new_value = _joruri_adjust_param(new_field.value, "filename")
-        new_value = _joruri_adjust_rfc2231_filename(new_value)
-        begin
-          new_field.field = Mail::ContentDispositionField.new(new_value, new_field.charset)
-        rescue Mail::Field::ParseError => e
-          error_log(e)
+module Mail
+  class JoruriAdjustor
+    def self.adjust_quotation(value, param)
+      if mt = value.match(/;\s*#{param}=(.*?)(;|$)/im)
+        if mt[1].strip[0] != '"'
+          value = value[0, mt.begin(1)] + '"' + mt[1].strip + '"' + value[mt.end(1), value.size]
         end
       end
+      return value
     end
-    _add_new_field_backed_up_by_joruri(new_field)
-  end
-
-  def _joruri_adjust_param(old_value, param)
-    match = old_value.match(/;\s*#{Regexp.escape(param)}="(.*?)"\s*(;|$)/im)
-    return old_value unless match
-    return old_value if match[1].ascii_only?
     
-    enc = NKF.guess(match[1])
-    nkf_opt = nil
-    nkf_opt = NKFUtil.output_option(enc.name) if enc
-    nkf_opt = "-w" unless nkf_opt
-    encoded = NKF.nkf("-M #{nkf_opt}", match[1]).gsub("\r\n", "\n").gsub(/\n[ \t]+/, ' ')
-    return old_value[0, match.begin(1)] + encoded + old_value[match.end(1), old_value.size]
-  end
-
-  def _joruri_adjust_rfc2231_filename(old_value)
-    target = old_value
-    new_value = ''
-    while target && match = target.match(/(filename\*(?:[0-9]+\*?)?=)(.*?)(;|$)/im)
-      new_value << target[0, match.begin(0)] << match[1]
-      if match[2] =~ /^([^']+'[^']*')?(.+)$/im
-        if $1.blank? && $2.strip[0] == '"'
-          new_value << $2.strip
-        else
-          new_value << "#{$1}" << $2.force_encoding('binary').gsub(/[\x00-\x1f\x7f-\xff\s\*'\(\)<>@,;:\\"\/\[\]\?=]/n) {|m|
-            sprintf('%%%x', m.ord)
-          }              
+    def self.adjust_encoding(value, param)
+      match = value.match(/;\s*#{Regexp.escape(param)}="(.*?)"\s*(;|$)/im)
+      return value unless match
+      return value if match[1].ascii_only?
+      
+      enc = NKF.guess(match[1])
+      nkf_opt = nil
+      nkf_opt = NKFUtil.output_option(enc.name) if enc
+      nkf_opt = "-w" unless nkf_opt
+      encoded = NKF.nkf("-M #{nkf_opt}", match[1]).gsub("\r\n", "\n").gsub(/\n[ \t]+/, ' ')
+      return value[0, match.begin(1)] + encoded + value[match.end(1), value.size]
+    end
+    
+    def self.chop_last_semicolon(value)
+      if value[-1] == ';'
+        value.gsub!(/;+$/, '')
+      end
+      return value
+    end
+    
+    def self.adjust_attachment(value)
+      if mt = value.match(/^\s*(attachment)(;|$)/im)
+        if mt[1].strip[0] != '"'
+          value = value[0, mt.begin(1)] + mt[1].downcase + value[mt.end(1), value.size]
         end
       end
-      new_value << match[3]
-      target = target[match.end(0), target.size]
+      return value
     end
-    new_value << target if target
-    new_value
+    
+    def self.adjust_rfc2231_filename(value)
+      target = value
+      new_value = ''
+      while target && match = target.match(/(filename\*(?:[0-9]+\*?)?=)(.*?)(;|$)/im)
+        new_value << target[0, match.begin(0)] << match[1]
+        if match[2] =~ /^([^']+'[^']*')?(.+)$/im
+          if $1.blank? && $2.strip[0] == '"'
+            new_value << $2.strip
+          else
+            new_value << "#{$1}" << $2.force_encoding('binary').gsub(/[\x00-\x1f\x7f-\xff\s\*'\(\)<>@,;:\\"\/\[\]\?=]/n) {|m|
+              sprintf('%%%x', m.ord)
+            }              
+          end
+        end
+        new_value << match[3]
+        target = target[match.end(0), target.size]
+      end
+      new_value << target if target
+      new_value
+    end
+    
+    def self.adjust_rfc2231_filename_ja(value)
+      accept_encoding = 'iso-2022-jp|shift_jis|euc-jp|utf-8'
+      if mt = value.match(/;\s*filename\*(?:0\*?)?=(?:#{accept_encoding})'(.*?)'/im)
+        if mt[1].blank?
+          value = value[0, mt.begin(1)] + 'ja' + value[mt.end(1), value.size]
+        end
+      end
+      return value
+    end
+    
+    def self.adjust_mime_type(value)
+      if mt = value.match(/^(.*?);/im)
+        if mt[1].blank? || mt[1] !~ /[^\/]+\/[^\/]+/
+          value = value[0, mt.begin(1)] + 'application/unknown' + value[mt.end(1), value.size]
+        end
+      end
+      return value
+    end
+  end
+
+  class ContentDispositionElement # :nodoc:
+    def initialize( string )
+      string = JoruriAdjustor.chop_last_semicolon(string)
+      string = JoruriAdjustor.adjust_attachment(string)
+      string = JoruriAdjustor.adjust_quotation(string, "filename")
+      string = JoruriAdjustor.adjust_encoding(string, "filename")
+      string = JoruriAdjustor.adjust_rfc2231_filename(string)
+      string = JoruriAdjustor.adjust_rfc2231_filename_ja(string)
+      parser = Mail::ContentDispositionParser.new
+      parser.consume_all_input = false
+      if tree = parser.parse(cleaned(string))
+        @disposition_type = tree.disposition_type.text_value
+        @parameters = tree.parameters
+      else
+        @disposition_type = ""
+        @parameters = [{}]
+      #else
+      #  raise Mail::Field::ParseError, "ContentDispositionElement can not parse |#{string}|\nReason was: #{parser.failure_reason}\n"
+      end
+      #if parser.failure_index != string.size
+      #  error_log("ContentDispositionElement can not parse |#{string}|\nReason was: #{parser.failure_reason}\n")
+      #end
+    end
+  end
+  
+  class ContentTypeElement # :nodoc:
+    def initialize( string )
+      string = JoruriAdjustor.adjust_quotation(string, "name")
+      string = JoruriAdjustor.adjust_encoding(string, "name")
+      string = JoruriAdjustor.adjust_mime_type(string)
+      parser = Mail::ContentTypeParser.new
+      parser.consume_all_input = false
+      if tree = parser.parse(cleaned(string))
+        @main_type = tree.main_type.text_value.downcase
+        @sub_type = tree.sub_type.text_value.downcase
+        @parameters = tree.parameters
+      else
+        @main_type = ""
+        @sub_type = ""
+        @parameters = [{}]
+      #else
+      #  raise Mail::Field::ParseError, "ContentTypeElement can not parse |#{string}|\nReason was: #{parser.failure_reason}\n"
+      end
+      #if parser.failure_index != string.size && (@main_type.empty? || @sub_type.empty?)
+      #  error_log("ContentTypeElement can not parse |#{string}|\nReason was: #{parser.failure_reason}\n")
+      #end
+    end
+  end
+  
+  class ContentDispositionField < StructuredField
+    def filename
+      case
+      when parameters['filename*']
+        @filename = parameters['filename*'].dup.force_encoding('utf-8')
+      when parameters['filename']
+        @filename = parameters['filename'].dup.force_encoding('utf-8')
+      when parameters['name']
+        @filename = parameters['name'].dup.force_encoding('utf-8')
+      else
+        @filename = nil
+      end
+      @filename
+    end
+  end
+  
+  class Body
+    def split!(boundary)
+      self.boundary = boundary
+      parts = raw_source.split("--#{boundary}")
+      # Make the preamble equal to the preamble (if any)
+      self.preamble = parts[0].to_s.strip
+      # Make the epilogue equal to the epilogue (if any)
+      self.epilogue = parts[-1].to_s.sub(/^--/, '').strip
+      parts[1...-1].to_a.each { |part| @parts << Mail::Part.new(part) }
+      unless self.epilogue.empty?
+        @parts << Mail::Part.new(self.epilogue)
+        self.epilogue = ""
+      end
+      self
+    end
   end
 end
 

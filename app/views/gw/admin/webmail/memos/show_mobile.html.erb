@@ -1,5 +1,5 @@
 <div class="memo">
-<div class="title"><%= Application.menu(:memo_menu) %></div>
+<div class="title"><%= Joruri.config.application['webmail.memo_menu'] %></div>
 <div class="body">
 <% if @item.value.empty? %>
   編集ボタンを押すとメモを登録できます。

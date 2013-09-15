@@ -9,21 +9,52 @@ html {
 
 /* Notice.
 ----------------------------------------------- */
-.notice {
- margin: 0px 10px 10px 10px;
- padding: 5px 10px;
- border: 1px solid #8da;
- background-color: #f0fff4;
- color: #073;
+.notice-basic {
+  margin: 0px 10px 10px 10px;
+  padding: 5px 10px;
+  border: 1px solid #8da;
+  background-color: #f0fff4;
+  color: #073;
 }
+.notice {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  padding: 6px 0px;
+  border-top: 1px solid #8da;
+  border-bottom: 1px solid #8da;
+  background-image: url(images/header/notice-back.png);
+}
+.notice p {
+  position: relative;
+  margin: 0px 10px;
+  padding: 8px 12px;
+  border: 1px solid #8da;
+  background-color: #fff;
+  color: #073;
+  font-weight: bold;
+}
+
+/* Notice. (Error)
+----------------------------------------------- */
+#errorNotice {
+  margin: 0px 10px 10px 10px;
+  padding: 8px 10px;
+  border: 1px solid #e00;
+  background-color: #fff4ff;
+  color: #e00;
+  font-weight: bold;
+}
+
 /* Maintenance Message.
 ----------------------------------------------- */
 #maintenanceMessage {
- margin: 0px 10px 10px 10px;
- padding: 10px 12px;
- border: 1px solid #fa6;
- background-color: #ffffdd;
- color: #000;	
+  margin: 0px 10px 10px 10px;
+  padding: 10px 12px;
+  border: 1px solid #fa6;
+  background-color: #ffffdd;
+  color: #000;	
 }
 #maintenanceMessage a {
   color: #e00;

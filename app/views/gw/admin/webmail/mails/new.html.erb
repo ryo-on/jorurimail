@@ -1,3 +1,74 @@
+<script type="text/javascript">
+//<![CDATA[
+function getRequestStatus(xml) {
+  var statusNodes = xml.getElementsByTagName('status');
+  if (statusNodes.length > 0 && statusNodes[0].firstChild) {
+    return statusNodes[0].firstChild.nodeValue;
+  }
+  var errorNodes = xml.getElementsByTagName('error');
+  if (errorNodes.length > 0 && errorNodes[0].firstChild) {
+    return errorNodes[0].firstChild.nodeValue;
+  }
+  return '';
+}
+function clickSubmitButton(button) {
+  var elm = document.createElement('input');
+  elm.name = button.name;
+  elm.value = button.value;
+  elm.setAttribute('type', 'hidden');
+  $('item_form').appendChild(elm);
+  if (button.form.onsubmit()) {
+    button.form.submit();
+  }
+}
+function showServerResponseError() {
+  alert('サーバーの応答がありません。しばらく時間をおいて送信して下さい。');
+}
+function showTokenError() {
+  alert('ログイン状態がリセットされました。画面を閉じて再度ログインしてから送信して下さい。');
+}
+function getAuthenticityToken() {
+  var tokenNodes = $$('input[name="authenticity_token"]');
+  if (tokenNodes.length > 0) {
+    return tokenNodes[0].value;
+  }
+  return '';
+}
+function checkServerStatus(button) {
+  var uri = "<%=raw status_gw_webmail_mails_path %>.xml";
+  var token = getAuthenticityToken();
+  var myAjax = new Ajax.Request(uri, {
+    method: 'post',
+    parameters: {
+      authenticity_token: token
+    },
+    onSuccess: function(request) {
+      if (request.responseXML) {
+        var status = getRequestStatus(request.responseXML);
+        switch (status) {
+          case 'OK':
+            clickSubmitButton(button);
+            break;
+          case 'NG TokenError':
+          case '500 This is a secure page.':
+            showTokenError();
+            break;
+          default:
+            showServerResponseError();
+            break;
+        }
+      } else {
+        showServerResponseError();
+      }
+    },
+    onFailure: function(request) {
+      showServerResponseError();
+    }
+  });
+}
+//]]>
+</script>
+
 <div id="mailFormContainer">
 <table id="webmailContainer"><tr><td id="webmailContent"><div id="mailContent" style="padding: 0px 10px;">
 
@@ -13,22 +84,34 @@
 
 <%= error_messages_for "item" %>
 
-<%= form_for(:item, :url => {:action => @form_action},
+<%= form_for(:item, :url => {:action => @form_action, :id => params[:id]},
   :html => {:id => "item_form", :method => @form_method, :multipart => true}) do |f| %>
 <%#= f.error_messages %>
 
+<% if false %>
+<%= hidden_field_tag :remain_draft, 1 %>
+<% end %>
+
 <div class="mailFormMenu">
   <div class="mailSubmitters" style="float: left;">
-    <%=raw submit([["送信する", "send"],["下書き保存", "draft"],["破棄する","destroy"]]) %>
+    <div class="submitters">
+      <%= tag :input, :type => 'button', :value => "送信する", :id => "commit_send1", :name => "commit_send", :class => "send", :onclick => "checkServerStatus(this); return false;" %>
+      <%= tag :input, :type => 'button', :value => "下書き保存", :id => "commit_draft1", :name => "commit_draft", :class => "draft", :onclick => "checkServerStatus(this); return false;" %>
+      <%= tag :input, :type => 'button', :value => "破棄する", :id => "commit_destroy1", :name => "commit_destroy", :class => "destroy", :onclick => "clickSubmitButton(this); return false;" %>
+    </div>
   </div>
 </div>
 
 <div>
 <%= render :partial => 'form', :locals => {:f => f} %>
 </div>
-  
+
 <div class="mailSubmitters">
-  <%=raw submit([["送信する", "send"],["下書き保存", "draft"],["破棄する","destroy"]]) %>
+  <div class="submitters">
+    <%= tag :input, :type => 'button', :value => "送信する", :id => "commit_send2", :name => "commit_send", :class => "send", :onclick => "checkServerStatus(this); return false;" %>
+    <%= tag :input, :type => 'button', :value => "下書き保存", :id => "commit_draft2", :name => "commit_draft", :class => "draft", :onclick => "checkServerStatus(this); return false;" %>
+    <%= tag :input, :type => 'button', :value => "破棄する", :id => "commit_destroy2", :name => "commit_destroy", :class => "destroy", :onclick => "clickSubmitButton(this); return false;" %>
+  </div>
 </div>
 
 <% end %>

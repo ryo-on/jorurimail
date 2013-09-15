@@ -1,6 +1,6 @@
 <%
 html_format = @item.in_format == Gw::WebmailMail::FORMAT_HTML
-attachment_file_max_size = Application.config(:attachment_file_max_size, 5)
+attachment_file_max_size = Joruri.config.application['webmail.attachment_file_max_size']
 %>
 <script type="text/javascript" src="/_common/js/swfupload/swfupload.js"></script>
 <script type="text/javascript" src="/_common/js/swfupload/plugins/swfupload.queue.js"></script>
@@ -16,9 +16,6 @@ var swfu = null;
 window.onload = function() {
   var list = document.getElementsByTagName('input');
   for (var i=0; i<list.length; i++) {
-    if(list[i].type.match(/^(text|password|radio|checkbox)$/) != ""){
-      list[i].onkeypress = function (event) { return stopSubmitting(event); }
-    }
     if(list[i].type == "text") {
       list[i].onkeydown = function (event) { return stopReset(event); }
     }
@@ -33,7 +30,7 @@ window.onload = function() {
   //<% unless @item.in_bcc.blank? %>
   toggleAddressInput('bcc');
   //<% end %>
-  initSwfupload(swfu);
+  initSwfupload();
   loadUploadedFiles();
   if ($('item_in_format').value == 'html') {
     initTinyMCE();
@@ -90,7 +87,7 @@ function applyOnClickToSubmitButtons(submits, onclick) {
   }
 }
 // file uploader
-function initSwfupload(swfu) {
+function initSwfupload() {
   swfu = new SWFUpload({
     upload_url : "<%= gw_webmail_attachments_path %>",
     post_params: {
@@ -193,6 +190,7 @@ function addUploadedFile(id, name, size, image_is) {
   }
   html += '<a href="' + uri +'" class="uploadedFileName '+ icon + '" ' + opt + ' >' + name.escapeHTML() + "(" + size + ")" + '</a>';
   html += '<a href="#" class="deleteUploadedFile" onclick="return deleteUploadedFile(\'' + id + '\')" title="削除">x</a>';
+  html += '<input type="hidden" name="item[tmp_attachment_ids][]" value="' + id + '" />'
   html += '</span> ';
   field.innerHTML += html;
 }
@@ -268,52 +266,57 @@ function text_to_html(text) {
   for (var i = 0;i < lines.length;i++) {
     line = lines[i].replace("\r", '').escapeHTML();
     line = line.replace(/(\s+)(\s)/, function(s, p1, p2) {
-    var nbsp = "";
-    for (var k = 0;k < p1.length;k++) {
-      nbsp += "&nbsp;";
-    }
+      var nbsp = "";
+      for (var k = 0;k < p1.length;k++) {
+        nbsp += "&nbsp;";
+      }
       return nbsp + p2;
-  });
-  if (line == '') line = '&nbsp;';
-    rslt += "<div>" + line + "</div>\n";
+    });
+    //if (line == '') line = '&nbsp;';
+    rslt += '<p style="margin: 0px; padding: 0px;">' + line + "</p>\n";
   }
   return rslt;
 }
+function html_to_text_by_node(node, blockquote){
+  var str = '';
+  if (node.nodeType == 1) { //Element
+    switch (node.nodeName.toLowerCase()) {
+      case 'br':
+        str += "\n";
+        break;
+      case 'blockquote':
+        blockquote++;
+        break;
+    }
+  } else if (node.nodeType == 3) { //Text
+    var txt = node.nodeValue;
+    if (!txt.match(/^\s+$/)) {
+      str += txt;
+    }
+  }
+  for (var i=0; i<node.childNodes.length; i++) {
+    str += html_to_text_by_node(node.childNodes[i], blockquote);
+  }
+  if (node.nodeType == 1) { //Element
+    switch (node.nodeName.toLowerCase()) {
+      case 'div':
+      case 'p':
+      case 'li':
+        str += "\n";
+        break;
+      case 'blockquote':
+        str = str.replace(/^(.*)/gm, "> $1");
+        str += "\n";
+        blockquote--;
+        break;
+    }
+  }
+  return str;
+}
 function html_to_text(html) {
-  var rslt = '';
-  var stack = [];
   var current = document.createElement('div');
   current.innerHTML = html;
-  while (current) {
-    var i = 0;
-    var nodes = current.childNodes;
-    while (i < nodes.length) {
-      var node = nodes[i];
-      if (node.nodeType == 1) { //Element
-        switch(node.nodeName.toLowerCase()) {
-        case 'div':
-        case 'p':
-        case 'li':
-          if (rslt != '') {
-            rslt += "\n";
-          }
-          break;
-        }
-        for (var k = i; k >= 0; k--) current.removeChild(nodes[k]);
-        stack.push(current);
-        stack.push(node);
-        break;
-      } else if (node.nodeType == 3) { //Text
-        var txt = node.nodeValue;
-        if (!txt.match(/^\s+$/)) {
-          rslt += txt;
-        }
-      }
-      i++;
-    }  
-    current = stack.pop();    
-  }
-  return rslt;
+  return html_to_text_by_node(current, 0);
 }
 function loadTemplate() {
   var elm_template = $('changeTemplate');
@@ -359,6 +362,8 @@ function showTemplate(template) {
     $('item_in_body').value = getNodeValue(template, 'body');
   }
 }
+var commitSendButtonOnClick = $('commit_send1').onclick;
+var commitDraftButtonOnClick = $('commit_draft1').onclick;
 function startAddressSelection(prefix) {
   var reverse = {'sys':'pri', 'pri':'sys'};
   var addressesForm = $('mailAddressesForm');
@@ -386,8 +391,8 @@ function addressSelectorCallBack(ok, to, cc, bcc) {
   $('mailAddressesForm').show();
   $('sys_openAddressButton').className = '';
   $('pri_openAddressButton').className = '';
-  applyOnClickToSubmitButtons($('item_form').commit_send, null);
-  applyOnClickToSubmitButtons($('item_form').commit_draft, null);
+  applyOnClickToSubmitButtons($('item_form').commit_send, commitSendButtonOnClick);
+  applyOnClickToSubmitButtons($('item_form').commit_draft, commitDraftButtonOnClick);
 }
 function toggleAddressInput(type) {
   var containerElm = $(type + 'Container');
@@ -399,8 +404,8 @@ function toggleAddressInput(type) {
 </script>
 
 <div id="openAddress">
-  <a href="#" id="sys_openAddressButton" onclick="return startAddressSelection('sys');"><%= Application.menu(:sys_address_menu) %></a>
-  <a href="#" id="pri_openAddressButton" onclick="return startAddressSelection('pri');"><%= Application.menu(:address_group_menu) %></a>
+  <a href="#" id="sys_openAddressButton" onclick="return startAddressSelection('sys');"><%= Joruri.config.application['webmail.sys_address_menu'] %></a>
+  <a href="#" id="pri_openAddressButton" onclick="return startAddressSelection('pri');"><%= Joruri.config.application['webmail.address_group_menu'] %></a>
 </div>
 
 <%= render :partial => "address_selector" %>
@@ -442,13 +447,10 @@ function toggleAddressInput(type) {
         </div>
       </td><td style="vertical-align: bottom;">
         <div class="editorMenu">
-          <% if nil %>
           <div class="formatSelector">
             <%= link_to 'TEXT', '#', :onclick => "toggleEditor('text');return false;", :title => "TEXT形式" %>
             <%= link_to 'HTML', '#', :onclick => "toggleEditor('html');return false;", :title => "HTML形式" %>
           </div>
-          <% end %>
-          
           <div class="templateSelector">
             <%= select_tag :changeTemplate,
               options_from_collection_for_select(Gw::WebmailTemplate.user_templates, 'id', 'name'),

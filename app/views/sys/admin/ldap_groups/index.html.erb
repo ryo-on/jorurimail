@@ -1,3 +1,12 @@
+<script type="text/javascript">
+//<![CDATA[
+function showSpec(u) {
+  var spec = $(u.id.replace(/Link$/, "Spec"));
+  if (spec.style.display == "none") spec.show(); else spec.hide();
+  return false;
+}
+//]]>
+</script>
 <div class="crudTree">
 <div class="tree">
   <p>
@@ -13,8 +22,14 @@
 <div class="content">
   <table class="index">
     <tr><th>Users</th></tr>
-    <% @users.each do |u| %>
-    <tr><td><%=h u.name %> (<%=h u.uid %>) <%=h u.email %></td></tr>
+    <% @users.each_with_index do |u, idx| %>
+    <tr><td>
+      <a id="uid<%= idx %>Link" href="#" onclick="return showSpec(this);">詳細</a>&nbsp;
+      <%=h u.name %> (<%=h u.uid %>) <%=h u.email %>
+      <div id="uid<%= idx %>Spec" style="display: none;"><hr />
+      <% u.attributes.each do |key, values| %><%= "#{key} : #{values.join(",")}" %><br /><% end %>
+      </div>
+    </td></tr>
     <% end %>
     <% if @users.size == 0 %><tr><td>no users<br /></td></tr><% end %>
   </table>

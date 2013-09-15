@@ -6,25 +6,58 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
   layout :select_layout
   
   def pre_dispatch
+    return if params[:action] == 'status'
     return redirect_to :action => 'index' if params[:reset]
+    
+    if params[:src] == 'mailto'
+      mailto = parse_mailto(params[:uri])
+      return redirect_to new_gw_webmail_mail_path(mailto.merge(:mailbox => 'INBOX'))
+    end
     
     @mailbox   = Gw::WebmailMailbox.load_mailbox(params[:mailbox] || 'INBOX')
     @filter    = ["UNDELETED"]
-    @sort      = ["DATE"]
+    @sort      = get_sort_params(@mailbox.name)
     @limit     = 20
     @new_window = params[:new_window].blank? ? nil : 1
     @mail_form_size = Gw::WebmailSetting.user_config_value(:mail_form_size, 'medium') unless params[:action] == 'index'
   end
   
   def load_mailboxes
+    load_starred_mails
     reload = flash[:gw_webmail_load_mailboxes]
     flash.delete(:gw_webmail_load_mailboxes)
     Gw::WebmailMailbox.load_quota(reload)
     Gw::WebmailMailbox.load_mailboxes(reload)
   end
   
-  def reset_mailboxes(mailbox = @mailbox.name)
-    flash[:gw_webmail_load_mailboxes] = mailbox
+  def reset_mailboxes(mailboxes = [:all])
+    flash[:gw_webmail_load_mailboxes] = mailboxes.uniq
+  end
+  
+  def load_starred_mails
+    Util::Database.lock_by_name(Core.user.account) do
+      cond = {:user_id => Core.user.id, :name => 'load_starred_mails'}
+      setting = Gw::WebmailSetting.find(:first, :conditions => cond)
+      if setting
+        mailbox_uids = JSON.parse(setting.value) rescue {}
+        Gw::WebmailSetting.delete_all(cond)
+        Gw::WebmailMailbox.load_starred_mails(mailbox_uids)
+      end
+    end
+  end
+  
+  def reset_starred_mails(mailbox_uids = {'INBOX' => :all})
+    Util::Database.lock_by_name(Core.user.account) do
+      cond = {:user_id => Core.user.id, :name => 'load_starred_mails'}
+      setting = Gw::WebmailSetting.find(:first, :conditions => cond) || Gw::WebmailSetting.new(cond)
+      hash = JSON.parse(setting.value) rescue {}
+      mailbox_uids.each do |mailbox, uids|
+        hash[mailbox] ||= []
+        hash[mailbox] = (hash[mailbox] + uids).uniq
+      end
+      setting.value = hash.to_json
+      setting.save
+    end
   end
   
   def load_quota
@@ -35,16 +68,17 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     return empty if params[:do] == 'empty'
     
     confs = Gw::WebmailSetting.user_config_values(
-      [:mails_per_page, :mail_form_size, :mail_list_from_address, :mail_list_subject, :mail_open_window])
-    @limit = confs[:mails_per_page].blank? ? 20 : confs[:mails_per_page] if !request.mobile?
+      [:mails_per_page, :mail_form_size, :mail_list_from_address, :mail_list_subject, :mail_open_window, :mail_address_history])
+    @limit = confs[:mails_per_page].blank? ? 20 : confs[:mails_per_page].to_i if !request.mobile?
     @mail_form_size = confs[:mail_form_size].blank? ? 'medium' : confs[:mail_form_size]
     @mail_list_from_address = confs[:mail_list_from_address]
     @mail_list_subject = confs[:mail_list_subject]
     @mail_open_window = confs[:mail_open_window]
+    @mail_address_history = confs[:mail_address_history].blank? ? 10 : confs[:mail_address_history].to_i
     
     ## apply filters
     last_uid, recent, error = Gw::WebmailFilter.apply_recents
-    reset_mailboxes(:all) if recent
+    reset_mailboxes([:all]) if recent
     if @mailbox.name == "INBOX"
       @filter += ["UID", "1:#{last_uid}"] # slows a little
     end
@@ -54,46 +88,36 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     end
     
     ## search
-    filter = @filter
-    if params[:search]
-      if !params[:s_status].blank?
-        filter += ["UNSEEN"] if params[:s_status] == "unseen"
-        filter += ["SEEN"]   if params[:s_status] == "seen"
-      end
-      if !params[:s_column].blank? && !params[:s_keyword].strip.blank?
-        keywords = []
-        params[:s_keyword].gsub("　", " ").split(/ +/).each do |w|
-          next if w.strip.blank?
-          keywords << %Q(#{params[:s_column]} "#{w.gsub('"', '\\"')}")
-        end
-        filter = filter.join(' ') + " " + keywords.join(' ')
-      end
-    elsif params[:s_from]
-      begin
-        from_addr = nil
-        from = Gw::WebmailMail.new.parse_address(params[:s_from]).first
-        from_addr = from.address if from
-      rescue => ex
-        from_addr = nil
-      end
-      if @mailbox.name =~ /^(Sent|Drafts)(\.|$)/
-        field = "TO"
-      else
-        field = "FROM"
-      end
-      filter += [field, from_addr] if from_addr
-    end
-    @s_params = params.dup; [:controller, :action, :mailbox].each {|n| @s_params.delete(n) }
+    filter = make_search_filter
+    
+    @s_params = make_search_params
     
     @mailboxes = load_mailboxes
     @quota = load_quota
+    @addr_histories = load_address_histories(@mail_address_history) if @mail_address_history != 0
+    
     @items = Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => filter,
       :sort => @sort, :page => params[:page], :limit => @limit)
+    
+    if params[:sort_starred] == '1'
+      @starred_items = Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => filter + " FLAGGED",
+        :sort => @sort, :page => params[:page], :limit => @limit)
+      if @starred_items.size < @limit
+        @unstarred_items = Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => filter + " UNFLAGGED",
+          :sort => @sort, :page => params[:page], :limit => @limit - @starred_items.size)
+      else
+        @unstarred_items = []
+      end
+    end
   end
   
   def show
     @item  = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
     return error_auth unless @item
+    
+    confs = Gw::WebmailSetting.user_config_values([:mail_attachment_view, :mail_address_history])
+    @mail_attachment_view = confs[:mail_attachment_view]
+    @mail_address_history = confs[:mail_address_history].blank? ? 10 : confs[:mail_address_history].to_i
     
     if params[:download] == "eml"
       filename = @item.subject + ".eml"
@@ -102,8 +126,15 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
       msg = @item.rfc822 || @item.mail.to_s
       return send_data(msg, :filename => filename,
         :type => 'message/rfc822', :disposition => 'attachment')
+    elsif params[:download] == 'all'
+      return download_all_attachments
     elsif params[:download]
       return download_attachment(params[:download])
+    elsif params[:header]
+      msg = @item.rfc822 || @item.mail.to_s
+      msg = msg.slice(0, msg.index("\r\n\r\n"))
+      return send_data(msg.gsub(/\r\n/m, "\n"),
+        :type => 'text/plain; charset=utf-8', :disposition => 'inline')
     elsif params[:source]
       msg = @item.rfc822 || @item.mail.to_s
       return send_data(msg.gsub(/\r\n/m, "\n"),
@@ -113,6 +144,8 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
       return respond_to do |format|
         format.xml { render :action => 'show_html' }
       end
+    elsif params[:show_thumbnail_image]
+      return render :action => 'show_thumbnail'
     end
     
     Core.title += " - #{@item.subject} - #{Core.user.email}"
@@ -128,17 +161,24 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     end rescue nil
     
     
-    if @item.draft? && @item.mail.header[:bcc].blank? && node = @item.find_node
-      @item.mail.header[:bcc] = node.bcc
+    if @item.draft? && @item.mail.header[:bcc].blank? && @item.node
+      @item.mail.header[:bcc] = @item.node.bcc
     end
     
-    @item.request_mdn = 1 if @item.has_disposition_notification_to?
-    
     if @item.unseen?
-      Core.imap.uid_store(@item.uid, "+FLAGS", [:Seen])
-      reset_mailboxes
+      changed_mailboxes = []
+      mailbox_uids = get_mailbox_uids(@mailbox, @item.uid)
+      mailbox_uids.each do |mailbox, uids|
+        num = Gw::WebmailMail.seen_all(mailbox, uids)
+        if num > 0
+          changed_mailboxes << mailbox
+        end
+      end
+      reset_mailboxes(changed_mailboxes)
       
-      if @item.has_disposition_notification_to?
+      @seen_flagged = true
+      
+      if @item.has_disposition_notification_to? && !@item.notified? && !@mailbox.draft_box?(:all) && !@mailbox.sent_box?(:all)
         @mdnRequest = mdn_request_mode
         if @mdnRequest && @mdnRequest == :auto
           begin
@@ -152,10 +192,40 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     
     @mailboxes  = load_mailboxes
     
-    cond        = { :select => @mailbox.name, :conditions => @filter, :sort => @sort }
+    filter = make_search_filter
+    
+    @s_params = make_search_params
+    
+    cond        = { :select => @mailbox.name, :conditions => filter, :sort => @sort, :sort_starred => params[:sort_starred] }
     @pagination = @item.single_pagination(params[:id], cond)
     
+    @addr_histories = load_address_histories(@mail_address_history) if @mail_address_history != 0
+    
     _show @item
+  end
+  
+  def download_all_attachments
+    zipdata = ""
+    Zip::Archive.open_buffer(zipdata, Zip::CREATE, Zip::NO_COMPRESSION) do |ar|
+      filenames = @item.attachments.map {|at| at.name}
+      filenames = unique_filenames(filenames)
+      @item.attachments.each_with_index do |at, i|
+        begin
+          filename = filenames[i]
+          filename = filename.gsub(/[\/\<\>\|:;"\?\*\\]/, '_')
+          filename = filename.encode(Encoding::Windows_31J, :invalid => :replace, :undef => :replace, :replace => '_') if request.user_agent =~ /Windows/
+          ar.add_buffer(filename, at.body)
+        rescue Zip::Error => e
+          # e
+        end
+      end
+    end
+    
+    subject = @item.subject.gsub(/[\/\<\>\|:;"\?\*\\\r\n]/, '_')
+    subject = subject.match(/^.{100}/).to_s if subject.length > 100
+    subject = URI::escape(subject) if request.user_agent =~ /MSIE/
+    filename = sprintf("%07d_%s.zip", @item.uid, subject)
+    send_data(zipdata, :type => 'application/zip', :filename => filename, :disposition => 'attachment')
   end
   
   def download_attachment(no)
@@ -163,17 +233,19 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     return http_error(404) unless @file = @item.attachments[no.to_i]
     #return http_error(404) unless @file.name == params[:filename]
     
-    filedata    = @file.body
-    disposition = @file.image? ? 'inline' : 'attachment'
-    if !params[:thumbnail].blank? && data = @file.thumbnail(:width => 480, :height => 360)
+    filedata     = @file.body
+    content_type = @file.content_type
+    disposition  = params[:disposition] ? params[:disposition] : (@file.image? ? 'inline' : 'attachment')
+    if !params[:thumbnail].blank? && data = @file.thumbnail(:width => params[:width] || 64, :height => params[:height] || 64, :format => :JPEG, :quality=> 70)
       filedata = data
+      content_type = 'image/jpeg'
     end
     
     filename = @file.name#@item.mail.unquote(@file.name)
-    filename = filename.gsub(/[\/\<\>\|:"\?\*\\]/, '_') 
+    filename = filename.gsub(/[\/\<\>\|:;"\?\*\\]/, '_') 
     filename = URI::escape(filename) if request.env['HTTP_USER_AGENT'] =~ /MSIE/
     
-    send_data(filedata, :type => @file.content_type, :filename => filename, :disposition => disposition)
+    send_data(filedata, :type => content_type, :filename => filename, :disposition => disposition)
   end
   
   def new
@@ -196,7 +268,12 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     
     load_address_from_flash
     
-    @item.in_to     = params[:to] if params[:to]
+    @item.in_to      = NKF::nkf('-w', params[:to]) if params[:to]
+    @item.in_cc      = NKF::nkf('-w', params[:cc]) if params[:cc]
+    @item.in_bcc     = NKF::nkf('-w', params[:bcc]) if params[:bcc]
+    @item.in_subject = NKF::nkf('-w', params[:subject]) if params[:subject]
+    @item.in_body    = "#{NKF::nkf('-w', params[:body])}\n\n#{@item.in_body}" if params[:body]
+    
     @item.in_format = Gw::WebmailMail::FORMAT_TEXT 
     
     #@mailboxes  = load_mailboxes
@@ -218,7 +295,7 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     @item.in_bcc     = @ref.friendly_bcc_addrs.join(',')
     @item.in_bcc     = ref_node.bcc if @item.in_bcc.blank? && ref_node 
     @item.in_subject = @ref.subject
-    if @ref.html_mail?
+    if params[:mail_view] == Gw::WebmailMail::FORMAT_HTML && @ref.html_mail?
       @item.in_html_body = @ref.html_body_for_edit
       @item.in_format    = Gw::WebmailMail::FORMAT_HTML         
     else
@@ -238,7 +315,6 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
   def answer
     return false if no_email?
     
-    sign_position = Gw::WebmailSetting.user_config_value(:sign_position)
     @form_action = "answer"
     
     @ref = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
@@ -248,26 +324,28 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     @item.reference = @ref
     
     if request.post?
-      return send_message(@item) { Core.imap.uid_store(@ref.uid, "+FLAGS", [:Answered]) }
+      return send_message(@item, @ref) do
+        mailbox_uids = get_mailbox_uids(@mailbox, @ref.uid)
+        mailbox_uids.each do |mailbox, uids|
+          Core.imap.select(mailbox)
+          Core.imap.uid_store(uids, "+FLAGS", [:Answered])
+        end
+      end
     end
     
     @item.tmp_id     = Sys::File.new_tmp_id
     @item.in_to      = @ref.friendly_reply_to_addrs(!params[:all].blank?).join(', ')
     @item.in_subject = "Re: " + @ref.subject
+    
     if params[:mail_view] == Gw::WebmailMail::FORMAT_HTML && @ref.html_mail?
-      @item.in_html_body = "<div>&nbsp;</div>#{@ref.referenced_html_body}"
-      @item.in_html_body += Util::String.text_to_html("\n" + default_sign_body) if default_sign_body  
+      quot_body = "<p style=\"margin:0px; padding:0px;\"></p>#{@ref.referenced_html_body}" if params[:qt]
+      sign_body = Util::String.text_to_html("\n" + default_sign_body) if default_sign_body
+      @item.in_html_body = concat_mail_body(quot_body, sign_body)
       @item.in_format = Gw::WebmailMail::FORMAT_HTML
     else
-      sign_body = ''
+      quot_body = "\n\n#{@ref.referenced_body}" if params[:qt]
       sign_body = "\n\n#{default_sign_body}" if default_sign_body
-      @item.in_body = ''
-      @item.in_body += "\n\n#{@ref.referenced_body}" if params[:qt]
-      if sign_position.blank?
-        @item.in_body = sign_body + @item.in_body 
-      else
-        @item.in_body += sign_body
-      end
+      @item.in_body = concat_mail_body(quot_body, sign_body)
       @item.in_format = Gw::WebmailMail::FORMAT_TEXT
     end
     
@@ -284,7 +362,6 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
   def forward
     return false if no_email?
     
-    sign_position = Gw::WebmailSetting.user_config_value(:sign_position)
     @form_action = "forward"
     
     @ref = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
@@ -293,25 +370,27 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     @item = Gw::WebmailMail.new(params[:item])
     
     if request.post?
-      return send_message(@item) { Core.imap.uid_store(@ref.uid, "+FLAGS", "$Forwarded") }
+      return send_message(@item, @ref) do
+        mailbox_uids = get_mailbox_uids(@mailbox, @ref.uid)
+        mailbox_uids.each do |mailbox, uids|
+          Core.imap.select(mailbox)
+          Core.imap.uid_store(uids, "+FLAGS", "$Forwarded")
+        end
+      end
     end
     
     @item.tmp_id      = Sys::File.new_tmp_id
     @item.in_subject  = "Fw: " + @ref.subject
     
     if params[:mail_view] == Gw::WebmailMail::FORMAT_HTML && @ref.html_mail?
-      @item.in_html_body = "<div>&nbsp;</div>#{@ref.referenced_html_body(:forward)}"
-      @item.in_html_body += Util::String.text_to_html("\n" + default_sign_body) if default_sign_body  
+      quot_body = "<p style=\"margin:0px; padding:0px;\"></p>#{@ref.referenced_html_body(:forward)}"
+      sign_body = Util::String.text_to_html("\n" + default_sign_body) if default_sign_body  
+      @item.in_html_body = concat_mail_body(quot_body, sign_body)
       @item.in_format = Gw::WebmailMail::FORMAT_HTML    
     else
-      sign_body = ''
+      quot_body = "\n\n#{@ref.referenced_body(:forward)}"
       sign_body = "\n\n#{default_sign_body}" if default_sign_body
-      @item.in_body = "\n\n#{@ref.referenced_body(:forward)}"
-      if sign_position.blank?
-        @item.in_body = sign_body + @item.in_body 
-      else
-        @item.in_body += sign_body
-      end
+      @item.in_body = concat_mail_body(quot_body, sign_body) 
       @item.in_format = Gw::WebmailMail::FORMAT_TEXT      
     end
     
@@ -357,8 +436,23 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     return false if no_email?
     @form_action = "create"
     
+    if params[:id] && params[:id] != '0' 
+      @ref = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
+      return http_error(404) unless @ref
+    end
+    
     @item = Gw::WebmailMail.new(params[:item])
-    send_message(@item)
+    send_message(@item, @ref) do
+      if !params[:remain_draft] && @ref && (@mailbox.draft_box?(:all) || @mailbox.star_box?)
+        mailbox_uids = get_mailbox_uids(@mailbox, @ref.uid)
+        mailbox_uids.each do |mailbox, uids|
+          num = Gw::WebmailMail.delete_all(mailbox, uids, true)
+          if num > 0
+            Gw::WebmailMailNode.delete_nodes(mailbox, uids)
+          end
+        end
+      end
+    end
   end
   
   def update
@@ -370,13 +464,13 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     return http_error(404) unless @ref
     
     @item = Gw::WebmailMail.new(params[:item])
-    send_message(@item) do
+    send_message(@item, @ref) do
       Gw::WebmailMailNode.delete_nodes(@mailbox.name, @ref.uid)
       @ref.destroy(true)
     end
   end
   
-  def send_message(item, &block)
+  def send_message(item, ref, &block)
     config = Gw::WebmailSetting.user_config_value(:mail_from)
     ma = Mail::Address.new
     ma.address      = Core.user.email
@@ -396,7 +490,7 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
         #@mailboxes  = load_mailboxes
         return render(:action => :new)
       end
-      return save_as_draft(item, &block)
+      return save_as_draft(item, ref, &block)
     end
     
     ## submit/send
@@ -410,10 +504,11 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
       mail.delivery_method(:smtp, ActionMailer::Base.smtp_settings)
       sent = mail.deliver
       item.delete_tmp_attachments
+      item.save_address_history
       #flash[:notice] = 'メールを送信しました。'.html_safe
     rescue => e
       #@mailboxes  = load_mailboxes
-      flash.now[:notice] = "メールの送信に失敗しました。（#{e}）"
+      flash.now[:error] = "メールの送信に失敗しました。（#{e}）"
       respond_to do |format|
         format.html { render :action => :new }
         format.xml  { render :xml => item.errors, :status => :unprocessable_entity }
@@ -426,13 +521,13 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     ## save to 'Sent'
     begin
       imap = Core.imap
-      #imap.create("Sent") unless imap.list("", "Sent")
-      imap.create("Sent") unless Gw::WebmailMailbox.exist?("Sent") rescue nil
+      imap.create("Sent") unless imap.list("", "Sent") rescue nil
+      #imap.create("Sent") unless Gw::WebmailMailbox.exist?("Sent") rescue nil
       item.mail = sent
-      imap.append("Sent", item.for_save.to_s, [:Seen], Time.now)
+      timeout(60) { imap.append("Sent", item.for_save.to_s, [:Seen], Time.now) }
     rescue => e
       #flash[:notice] += "<br />送信トレイへの保存に失敗しました。（#{e}）".html_safe
-      flash[:notice] = "送信トレイへの保存に失敗しました。（#{e}）"
+      flash[:error] = "メールは送信できましたが、送信トレイへの保存に失敗しました。（#{e}）"
     end
     
     status         = params[:_created_status] || :created
@@ -443,15 +538,17 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     end
   end
   
-  def save_as_draft(item, &block)
+  def save_as_draft(item, ref, &block)
     begin
       mail = item.prepare_mail(request)
       imap = Core.imap
-      #imap.create("Drafts") unless imap.list("", "Drafts")
-      imap.create("Drafts") unless Gw::WebmailMailbox.exist?("Drafts") rescue nil
-      next_uid = imap.status("Drafts", ["UIDNEXT"])["UIDNEXT"]
+      imap.create("Drafts") unless imap.list("", "Drafts") rescue nil
+      #imap.create("Drafts") unless Gw::WebmailMailbox.exist?("Drafts") rescue nil
+      #next_uid = imap.status("Drafts", ["UIDNEXT"])["UIDNEXT"]
       item.mail = mail
-      imap.append("Drafts", item.for_save.to_s, [:Seen, :Draft], Time.now)
+      flags = [:Seen, :Draft]
+      flags << :Flagged if ref && ref.starred?
+      timeout(30) { imap.append("Drafts", item.for_save.to_s, flags, Time.now) }
       item.delete_tmp_attachments
       
       ## save bcc
@@ -465,7 +562,7 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
       yield if block_given?
     rescue => error
       #@mailboxes  = load_mailboxes
-      item.errors.add_to_base "下書き保存に失敗しました。（#{error}）"
+      item.errors.add :base, "下書き保存に失敗しました。（#{error}）"
       flash.now[:notice] = "下書き保存に失敗しました。（#{error}）"
       respond_to do |format|
         format.html { render :action => :new }
@@ -487,9 +584,23 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     @item  = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
     return error_auth unless @item
     
-    Gw::WebmailMailNode.delete_nodes(@mailbox.name, @item.uid)
-    if @item.destroy
-      reset_mailboxes(:all)
+    changed_num = 0
+    changed_mailbox_uids = {}
+    
+    mailbox_uids = get_mailbox_uids(@mailbox, @item.uid)
+    mailbox_uids.each do |mailbox, uids|
+      num = Gw::WebmailMail.delete_all(mailbox, uids)
+      if num > 0
+        Gw::WebmailMailNode.delete_nodes(mailbox, uids)
+        changed_mailbox_uids['Trash'] = [:all]
+      end
+      changed_num += num if mailbox !~ /^(Star)$/
+    end
+    
+    if changed_num > 0
+      reset_mailboxes([:all])
+      reset_starred_mails(changed_mailbox_uids) if @item.starred?
+      
       flash[:notice] = 'メールを削除しました。' unless @new_window
       respond_to do |format|
         format.html do
@@ -499,9 +610,12 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
         format.xml  { head :ok }
       end
     else
-      flash.now[:notice] = 'メールの削除に失敗しました。'
+      flash[:error] = 'メールの削除に失敗しました。'
       respond_to do |format|
-        format.html { render :action => :show }
+        format.html do
+          action = @new_window ? :close : :index
+          redirect_to url_for(:action => action)
+        end
         format.xml  { render :xml => @item.errors, :status => :unprocessable_entity }
       end
     end
@@ -519,36 +633,50 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     if !params[:item][:mailbox]
       @items = Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => cond)
       @mailboxes = load_mailboxes
+      
+      confs = Gw::WebmailSetting.user_config_values([:mail_address_history])
+      @mail_address_history = confs[:mail_address_history].blank? ? 10 : confs[:mail_address_history].to_i
+      @addr_histories = load_address_histories(@mail_address_history) if @mail_address_history != 0
+      
       return render :template => 'gw/admin/webmail/mails/move'
     end
     
-    dcon = Condition.new do |c|
-      c.and :user_id, Core.user.id
-      c.and :mailbox, @mailbox.name
-      c.and :uid, 'IN', uids
-    end
-    Gw::WebmailMailNode.delete_all(dcon.where) if params[:copy].blank?
+    changed_num = 0
+    changed_mailbox_uids = {}
+    include_starred_uid = Gw::WebmailMail.include_starred_uid?(@mailbox.name, uids)
     
-    Core.imap.select(@mailbox.name)
-    response = Core.imap.uid_copy(uids, params[:item][:mailbox])
-    num = 0
-    if response.name == "OK"
-      if params[:copy].blank?
-        num = Core.imap.uid_store(uids, "+FLAGS", [:Deleted]).size rescue 0
-        Core.imap.expunge
+    mailbox_uids = get_mailbox_uids(@mailbox, uids)
+    mailbox_uids.each do |mailbox, uids|
+      if mailbox =~ /^(Star)$/
+        num = 0
+        if params[:copy].blank? #move
+          num = Gw::WebmailMail.delete_all(mailbox, uids, true)
+          Gw::WebmailMailNode.delete_nodes(mailbox, uids) if num > 0
+        end
       else
-        num = uids.size
+        if params[:copy].blank? #move
+          num = Gw::WebmailMail.move_all(mailbox, params[:item][:mailbox], uids)
+          Gw::WebmailMailNode.delete_nodes(mailbox, uids) if num > 0
+        else
+          num = Gw::WebmailMail.copy_all(mailbox, params[:item][:mailbox], uids)
+        end
+        changed_num += num
+      end
+      if num > 0
+        changed_mailbox_uids[params[:item][:mailbox]] = [:all]
       end
     end
+    
+    reset_mailboxes([:all])
+    reset_starred_mails(changed_mailbox_uids) if include_starred_uid
     
 #    num = 0
 #    Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => cond).each do |item|
 #      num += 1 if item.move(params[:item][:mailbox])
 #    end
     
-    reset_mailboxes(:all) if num > 0
     label = params[:copy].blank? ? '移動' : 'コピー'
-    flash[:notice] = "#{num}件のメールを#{label}しました。".force_encoding('utf-8') unless @new_window
+    flash[:notice] = "#{changed_num}件のメールを#{label}しました。".force_encoding('utf-8') unless @new_window
     action = @new_window ? :close : :index
     redirect_to url_for(:action => action, :page => params[:page])
   end
@@ -560,28 +688,29 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     end
     
     uids = params[:item][:ids].collect{|k, v| k.to_s =~ /^[0-9]+$/ ? k.to_i : nil }
-    cond = ["UID", uids] + @filter
     
-    dcon = Condition.new do |c|
-      c.and :user_id, Core.user.id
-      c.and :mailbox, @mailbox.name
-      c.and :uid, 'IN', uids
-    end
-    Gw::WebmailMailNode.delete_all(dcon.where)
+    changed_num = 0
+    changed_mailbox_uids = {}
+    include_starred_uid = Gw::WebmailMail.include_starred_uid?(@mailbox.name, uids)
     
-    Core.imap.select(@mailbox.name)
-    if !@mailbox.trash_box?(:all)
-      Core.imap.uid_copy(uids, 'Trash') rescue nil
+    mailbox_uids = get_mailbox_uids(@mailbox, uids)
+    mailbox_uids.each do |mailbox, uids|
+      num = Gw::WebmailMail.delete_all(mailbox, uids)
+      if num > 0
+        Gw::WebmailMailNode.delete_nodes(mailbox, uids)
+        changed_mailbox_uids['Trash'] = [:all]
+      end
+      changed_num += num if mailbox !~ /^(Star)$/
     end
-    num = Core.imap.uid_store(uids, "+FLAGS", [:Deleted]).size rescue 0
-    Core.imap.expunge
-
+    
+    reset_mailboxes([:all])
+    reset_starred_mails(changed_mailbox_uids) if include_starred_uid
+    
 #    Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => cond).each do |item|
 #      num += 1 if item.destroy
 #    end
     
-    reset_mailboxes(:all) if num > 0
-    flash[:notice] = "#{num}件のメールを削除しました。".force_encoding('utf-8')
+    flash[:notice] = "#{changed_num}件のメールを削除しました。".force_encoding('utf-8')
     redirect_to url_for(:action => :index, :page => 1) #params[:page]
   end
   
@@ -591,21 +720,23 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     end
     
     uids = params[:item][:ids].collect{|k, v| k.to_s =~ /^[0-9]+$/ ? k.to_i : nil }
-    cond = ["UID", uids] + @filter
     
-    num = 0
-    Core.imap.select(@mailbox.name)
-    uids.each do |uid|
-      begin
-        Core.imap.uid_store(uid, "+FLAGS", [:Seen])
-        num += 1
-      rescue => e
-        #e
+    changed_num = 0
+    changed_mailboxes = []
+    
+    mailbox_uids = get_mailbox_uids(@mailbox, uids)
+    mailbox_uids.each do |mailbox, uids|
+      num = Gw::WebmailMail.seen_all(mailbox, uids)
+      if num > 0
+        changed_mailboxes << mailbox
+        changed_mailboxes << 'Star'
       end
+      changed_num += num if mailbox !~ /^(Star)$/
     end
     
-    reset_mailboxes if num > 0
-    flash[:notice] = "#{num}件のメールを既読にしました。".force_encoding('utf-8')
+    reset_mailboxes(changed_mailboxes)
+    
+    flash[:notice] = "#{changed_num}件のメールを既読にしました。".force_encoding('utf-8')
     redirect_to url_for(:action => :index, :page => params[:page])
   end
   
@@ -615,47 +746,62 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     end
     
     uids = params[:item][:ids].collect{|k, v| k.to_s =~ /^[0-9]+$/ ? k.to_i : nil }
-    cond = ["UID", uids] + @filter
     
-    num = 0
-    Core.imap.select(@mailbox.name)
-    uids.each do |uid|
-      begin
-        Core.imap.uid_store(uid, "-FLAGS", [:Seen])
-        num += 1
-      rescue => e
-        #e
+    changed_num = 0
+    changed_mailboxes = []
+    
+    mailbox_uids = get_mailbox_uids(@mailbox, uids)
+    mailbox_uids.each do |mailbox, uids|
+      num = Gw::WebmailMail.unseen_all(mailbox, uids)
+      if num > 0
+        changed_mailboxes << mailbox
       end
+      changed_num += num if mailbox !~ /^(Star)$/
     end
     
-    reset_mailboxes if num > 0
-    flash[:notice] = "#{num}件のメールを未読にしました。".force_encoding('utf-8')
+    reset_mailboxes(changed_mailboxes)
+    
+    flash[:notice] = "#{changed_num}件のメールを未読にしました。".force_encoding('utf-8')
     redirect_to url_for(:action => :index, :page => params[:page])
   end
   
   def empty
-    reset_mailboxes(:all)
-    load_mailboxes.reverse.each do |box|
+    reset_mailboxes([:all])
+    changed_mailbox_uids = {}
+    
+    mailboxes = load_mailboxes
+    mailboxes.reverse.each do |box|
       if box.trash_box?(:children)
         begin
           Gw::WebmailMailNode.delete_nodes(box.name)
           Core.imap.delete(box.name)
+          
+          uids = Gw::WebmailMailNode.find_ref_nodes(box.name).map{|x| x.uid}
+          num = Gw::WebmailMail.delete_all('Star', uids)
+          if num > 0
+            Gw::WebmailMailNode.delete_ref_nodes(box.name)
+            changed_mailbox_uids[box.name] = [:all]
+          end
         rescue => e
         end
       end
     end
     
-    Gw::WebmailMailNode.delete_nodes(@mailbox.name)
     Core.imap.select(@mailbox.name)
-    Core.imap.uid_search(@filter, "utf-8").each do |uid|
-      begin
-        Core.imap.uid_store(uid, "+FLAGS", [:Deleted])
-      rescue => e
+    uids = Core.imap.uid_search(@filter, "utf-8")
+    
+    mailbox_uids = get_mailbox_uids(@mailbox, uids)
+    mailbox_uids.each do |mailbox, uids|
+      num = Gw::WebmailMail.delete_all(mailbox, uids, true)
+      if num > 0
+        Gw::WebmailMailNode.delete_nodes(mailbox, uids)
+        changed_mailbox_uids[mailbox] = [:all]
       end
     end
-    Core.imap.expunge
     
-    reset_mailboxes(:all)
+    reset_mailboxes([:all])
+    reset_starred_mails(changed_mailbox_uids)
+    
     flash[:notice] = "ごみ箱を空にしました。"
     respond_to do |format|
       format.html { redirect_to url_for(:action => :index) }
@@ -667,7 +813,102 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     @item = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
     return error_auth unless @item && @item.has_disposition_notification_to?
 
-    send_mdn_message(params[:send_mode])
+    if params[:mobile]
+      begin
+        send_mdn_message(params[:send_mode])
+        flash[:notice] = "開封確認メールを送信しました。"
+      rescue => e
+        flash[:notice] = "開封確認メールの送信に失敗しました。"
+      end
+      return redirect_to url_for(:action => :show)
+    else
+      send_mdn_message(params[:send_mode])
+    end
+  end
+  
+  def reset_address_history
+    Gw::WebmailMailAddressHistory.delete_all(:user_id => Core.user.id)
+    
+    flash[:notice] = 'クイックアドレス帳をリセットしました。'
+    redirect_to url_for(:action => :index, :page => params[:page])
+  end
+  
+  def register_spam
+    if !params[:item] || !params[:item][:ids]
+      return redirect_to url_for(:action => :index, :page => params[:page])
+    end
+    
+    uids = params[:item][:ids].collect{|k, v| k.to_s =~ /^[0-9]+$/ ? k.to_i : nil }
+    cond = ["UID", uids] + @filter
+    items = Gw::WebmailMail.find(:all, :select => @mailbox.name, :conditions => cond, :sort => @sort)
+    
+    if items.count == 0
+      return redirect_to url_for(:action => :index, :page => params[:page])
+    end
+    
+    Gw::WebmailFilter.register_spams(items)
+    
+    changed_num = 0
+    changed_mailbox_uids = {}
+    include_starred_uid = Gw::WebmailMail.include_starred_uid?(@mailbox.name, uids)
+    
+    mailbox_uids = get_mailbox_uids(@mailbox, uids)
+    mailbox_uids.each do |mailbox, uids|
+      num = Gw::WebmailMail.delete_all(mailbox, uids)
+      if num > 0
+        Gw::WebmailMailNode.delete_nodes(mailbox, uids)
+        changed_mailbox_uids['Trash'] = [:all]
+      end
+      changed_num += num if mailbox !~ /^(Star)$/
+    end
+    
+    reset_mailboxes([:all])
+    reset_starred_mails(changed_mailbox_uids) if include_starred_uid
+    
+    flash[:notice] = "#{items.count}件のメールを迷惑メールに登録しました。"
+    redirect_to url_for(:action => :index, :page => params[:page])
+  end
+  
+  def star
+    @item  = Gw::WebmailMail.find_by_uid(params[:id], :select => @mailbox.name, :conditions => @filter)
+    return error_auth unless @item
+    
+    starred = @item.starred?
+    changed_mailbox_uids = {}
+    
+    mailbox_uids = get_mailbox_uids(@mailbox, @item.uid)
+    mailbox_uids.each do |mailbox, uids|
+      if starred
+        num = Gw::WebmailMail.unstar_all(mailbox, uids)
+      else
+        num = Gw::WebmailMail.star_all(mailbox, uids)
+      end
+      if num > 0
+        changed_mailbox_uids[mailbox] = uids
+      end
+    end
+    
+    reset_mailboxes([:all])
+    reset_starred_mails(changed_mailbox_uids)
+    
+    if request.mobile? && !request.smart_phone?
+      s_params = make_search_params
+      if params[:from] == 'list' || @mailbox.name =~ /^(Star)$/
+        redirect_to url_for(s_params.merge(:action => :index, :id => params[:id], :mailbox => @mailbox.name, :mobile => :list))
+      else
+        redirect_to url_for(s_params.merge(:action => :show, :id => params[:id], :mailbox => @mailbox.name))
+      end
+    else
+      render :text => "OK"
+    end
+  end
+  
+  def status
+    @status = "OK"
+    
+    if protect_against_forgery? && form_authenticity_token != form_authenticity_param
+      @status = "NG TokenError"
+    end
   end
   
 protected
@@ -752,6 +993,9 @@ protected
     mail = mdn.prepare_mdn(@item, mdn_mode.to_s, request)
     mail.delivery_method(:smtp, ActionMailer::Base.smtp_settings)
     mail.deliver
+    
+    Core.imap.uid_store(@item.uid, "+FLAGS", "$Notified")
+    @item.flags << "$Notified"
   end
   
   def load_address_from_flash
@@ -760,4 +1004,159 @@ protected
     @item.in_bcc = flash[:mail_bcc] if flash[:mail_bcc]
   end
   
+  def concat_mail_body(quot_body, sign_body)
+    sign_position = Gw::WebmailSetting.user_config_value(:sign_position)
+    if sign_position.blank?
+      "#{sign_body}#{quot_body}"
+    else
+      "#{quot_body}#{sign_body}"
+    end
+  end
+  
+  def get_sort_params(mailbox_name)
+    key = params[:sort_key]
+    order = params[:sort_order]
+    
+    unless key
+      key = 'date'
+      order = 'reverse'
+    end
+    
+    params[:sort_key] = key
+    params[:sort_order] = order
+    
+    sort_params = []
+    sort_params += [order.upcase] if order.upcase != ""
+    sort_params += [key.upcase]
+    sort_params += ['REVERSE', 'DATE'] if key != 'date'
+    sort_params
+  end
+  
+  def make_search_params
+    s_params = params.dup
+    [:controller, :action, :mailbox].each {|n| s_params.delete(n) }
+    s_params
+  end
+  
+  def make_search_filter
+    filter = @filter
+    
+    if params[:search]
+      if !params[:s_status].blank?
+        filter += ["UNSEEN"] if params[:s_status] == "unseen"
+        filter += ["SEEN"]   if params[:s_status] == "seen"
+      end
+      if !params[:s_column].blank? && !params[:s_keyword].strip.blank?
+        #keywords = []
+        params[:s_keyword].gsub("　", " ").split(/ +/).each do |w|
+          next if w.strip.blank?
+          #keywords << %Q(#{params[:s_column]} "#{w.gsub('"', '\\"')}")
+          filter << "#{params[:s_column].upcase}"
+          filter << "\"#{w.gsub('"', '\\"')}\""
+        end
+        #filter = filter.join(' ') + " " + keywords.join(' ')
+      end
+    end
+    
+    if !params[:s_flag].blank?
+      filter += ["FLAGGED"]   if params[:s_flag] == "starred"
+      filter += ["UNFLAGGED"] if params[:s_flag] == "unstarred"
+    end
+    
+    if params[:s_from]
+      begin
+        from_addr = nil
+        from = Gw::WebmailMail.new.parse_address(params[:s_from]).first
+        from_addr = from.address if from
+      rescue => ex
+        from_addr = nil
+      end
+      field = @mailbox.name =~ /^(Sent|Drafts)(\.|$)/ ? "TO" : "FROM"
+      filter += [field, "\"#{from_addr.gsub(/"/, '')}\""] if from_addr
+    end
+    
+    filter.join(' ')
+  end
+  
+  def unique_filenames(filenames)
+    uniques = []
+    filenames.each do |filename|
+      if uniques.include?(filename)
+        for n in 1..255
+          seq_filename = "#{File.basename(filename, ".*")}_#{n}#{File.extname(filename)}"
+          unless uniques.include?(seq_filename)
+            filename = seq_filename
+            break
+          end
+        end
+      end
+      uniques << filename
+    end
+    return uniques
+  end
+  
+  def parse_mailto(uri)
+    mailto_params = Hash.new
+    if uri
+      begin
+        [:to, :cc, :bcc, :subject, :body].each{|k| uri += "&#{k}=#{params[k]}" if params[k]}
+        mailto = URI.parse(URI.escape(NKF::nkf('-w', uri)))
+        if mailto.is_a?(URI::MailTo)
+          mailto_params[:to] = URI.unescape(mailto.to)
+          mailto.headers.each do |header|
+            mailto_params[header[0].to_sym] = URI.unescape(header[1])
+          end
+        end
+      rescue
+      end
+    end
+    mailto_params
+  end
+  
+  def load_address_histories(history_count)
+    histories = Gw::WebmailMailAddressHistory.find(:all, 
+      :select => 'count(*) as cnt, address, friendly_address', 
+      :conditions => {:user_id => Core.user.id}, 
+      :group => :address, :limit => history_count, :order => 'cnt DESC, created_at DESC')
+    
+    emails = histories.map{|x| x.address}
+    
+    domain = Core.config['mail_domain'] || ''
+    sys_emails = histories.select{|x| x.address =~ /[@\.]#{Regexp.escape(domain)}$/i}.map{|x| x.address}
+    
+    addresses = Gw::WebmailAddress.find(:all, 
+      :select => "email, name", :conditions => {:email => emails, :user_id => Core.user.id})
+    sys_addresses = Sys::User.find(:all, 
+      :select => "email, name", :conditions => {:email => sys_emails})
+    
+    histories.each do |history|
+      if addr = addresses.find{|x| x.email == history.address}
+        history.display_name = addr.name
+      elsif addr = sys_addresses.find{|x| x.email == history.address}
+        history.display_name = addr.name
+      end
+    end
+    
+    histories
+  end
+  
+  def get_mailbox_uids(mailbox, uids)
+    mailbox_uids = {}
+    uids = [uids] if uids.is_a?(Fixnum)
+    if mailbox.star_box?
+      nodes = Gw::WebmailMailNode.find_nodes(mailbox.name, uids)
+      nodes = nodes.select{|x| x.ref_mailbox && x.ref_uid}.group_by(&:ref_mailbox)
+      nodes.each do |k,v| 
+        mailbox_uids[k] = v.map{|x| x.ref_uid}
+      end
+    else
+      nodes = Gw::WebmailMailNode.find_ref_nodes(mailbox.name, uids)
+      nodes = nodes.group_by(&:mailbox)
+      nodes.each do |k,v| 
+        mailbox_uids[k] = v.map{|x| x.uid}
+      end
+    end
+    mailbox_uids[mailbox.name] = uids
+    mailbox_uids
+  end
 end

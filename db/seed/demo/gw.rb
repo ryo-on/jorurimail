@@ -24,7 +24,7 @@ Gw::WebmailTemplate.create(
 Gw::WebmailSign.create(
   :user_id      => current_user.id,
   :name         => "署名１",
-  :body         => ("="*40) + "\nジョールリ市 ○○部○○課\n○○ ○○様\n#{current_user.email}\n" + ("="*40),
+  :body         => ("="*40) + "\nジョールリ市 ○○部○○課\n○○ ○○\n#{current_user.email}\n" + ("="*40),
   :default_flag => 1
 )
 
@@ -39,5 +39,13 @@ Gw::WebmailFilter.create(
   :in_columns       => {"0" => "subject"},
   :in_inclusions    => {"0" => "<"},
   :in_values        => {"0" => "広告"}
+)
+
+Gw::WebmailDoc.create(
+  :state            => "public",
+  :sort_no          => 1,
+  :published_at     => Time.now,
+  :title            => "Joruri Mailについて",
+  :body             => %Q(<p>Joruri Mail ver.#{Joruri.version}</p><p>Joruri Mail is available under the GNU General Public License (GPL v3).</p><p>Copyright(C) 2012 Joruri Project.</p><p><a title="http://www.joruri.org/" href="http://www.joruri.org/" target="_blank">http://www.joruri.org/</a></p>)
 )
 

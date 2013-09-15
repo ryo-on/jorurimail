@@ -34,6 +34,8 @@ class Sys::User < ActiveRecord::Base
     :order => 'id', :dependent => :destroy
   has_many :webmail_templates, :foreign_key => :user_id, :class_name => 'Gw::WebmailTemplate',
     :order => 'id', :dependent => :destroy
+  has_many :webmail_mail_address_histories, :foreign_key => :user_id, :class_name => 'Gw::WebmailMailAddressHistory',
+    :order => 'id', :dependent => :destroy
   
   attr_accessor :in_group_id
   #attr_accessor :group, :group_id, :in_group_id
@@ -171,35 +173,37 @@ class Sys::User < ActiveRecord::Base
       s.gsub(/[\\%_]/) {|r| "\\#{r}"}
     end
 
-    params.each do |n, v|
-      next if v.to_s == ''
-
-      case n
-      when 's_id'
-        self.and :id, v
-      when 's_state'
-        self.and 'sys_users.state', v
-      when 's_account'
-        self.and 'sys_users.account', 'LIKE', "%#{like_param.call(v)}%"
-      when 's_name'
-        self.and 'sys_users.name', 'LIKE', "%#{like_param.call(v)}%"
-      when 's_email'
-        self.and 'sys_users.email', 'LIKE', "%#{like_param.call(v)}%"
-      when 's_group_id'
-        if v == 'no_group'
-          self.join 'LEFT OUTER JOIN sys_users_groups ON sys_users_groups.user_id = sys_users.id' +
-            ' LEFT OUTER JOIN sys_groups ON sys_users_groups.group_id = sys_groups.id'
-          self.and 'sys_groups.id',  'IS', nil
-        else
-          self.join :groups
-          self.and 'sys_groups.id', v
+    params.each do |n, vs|
+      next if vs.to_s == ''
+      vs.split(/[ 　]+/).each do |v|
+        next if v == ''
+        case n
+        when 's_id'
+          self.and :id, v
+        when 's_state'
+          self.and 'sys_users.state', v
+        when 's_account'
+          self.and 'sys_users.account', 'LIKE', "%#{like_param.call(v)}%"
+        when 's_name'
+          self.and 'sys_users.name', 'LIKE', "%#{like_param.call(v)}%"
+        when 's_email'
+          self.and 'sys_users.email', 'LIKE', "%#{like_param.call(v)}%"
+        when 's_group_id'
+          if v == 'no_group'
+            self.join 'LEFT OUTER JOIN sys_users_groups ON sys_users_groups.user_id = sys_users.id' +
+              ' LEFT OUTER JOIN sys_groups ON sys_users_groups.group_id = sys_groups.id'
+            self.and 'sys_groups.id',  'IS', nil
+          else
+            self.join :groups
+            self.and 'sys_groups.id', v
+          end
+        when 's_name_or_kana'
+          kana_v = v.to_s.tr("ぁ-ん", "ァ-ン")
+          cond = Condition.new
+          cond.or 'sys_users.name', 'LIKE', "%#{like_param.call(v)}%"
+          cond.or 'sys_users.kana', 'LIKE', "%#{like_param.call(kana_v)}%"
+          self.and cond
         end
-      when 's_name_or_kana'
-        kana_v = v.to_s.tr("ぁ-ん", "ァ-ン")
-        cond = Condition.new
-        cond.or 'sys_users.name', 'LIKE', "%#{like_param.call(v)}%"
-        cond.or 'sys_users.kana', 'LIKE', "%#{like_param.call(kana_v)}%"
-        self.and cond
       end
     end if params.size != 0
 
@@ -241,7 +245,16 @@ class Sys::User < ActiveRecord::Base
     end
     return user
   end
-
+  
+  def authenticate_mobile_password(_mobile_password)
+    if mobile_access == 1
+      if !mobile_password.to_s.empty? && mobile_password == _mobile_password
+        return self
+      end
+    end
+    return nil
+  end
+  
   def encrypt_password
     return if password.blank?
     Util::String::Crypt.encrypt(password)

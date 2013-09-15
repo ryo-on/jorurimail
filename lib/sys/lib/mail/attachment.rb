@@ -57,21 +57,24 @@ class Sys::Lib::Mail::Attachment
   def thumbnail(options)
     begin
       require 'RMagick'
-      image = Magick::Image.from_blob(data).shift
-      raise 'NotImage' unless image.format =~ /(GIF|JPEG|PNG)/
+      image = Magick::Image.from_blob(@body).shift
+      raise 'NotImage' unless image.format =~ /(GIF|JPEG|PNG|BMP)/
       src_w = image.columns.to_f
       src_h = image.rows.to_f
-      raise 'NotNeedThumbnail' if src_w <= options[:width] && src_h <= options[:height]
       dst_w = options[:width].to_f
       dst_h = options[:height].to_f
-      src_r = (src_w / src_h)
-      dst_r = (dst_w / dst_h)
-      if dst_r > src_r
-        dst_w = (dst_h * src_r);
-      else
-        dst_h = (dst_w / src_r);
+      if src_w > dst_w || src_h > dst_h
+        src_r = (src_w / src_h)
+        dst_r = (dst_w / dst_h)
+        if dst_r > src_r
+          dst_w = (dst_h * src_r);
+        else
+          dst_h = (dst_w / src_r);
+        end
+        image.format = options[:format].to_s if options[:format]
+        image.thumbnail!(dst_w.ceil, dst_h.ceil)
       end
-      return image.resize(dst_w.ceil, dst_h.ceil).to_blob
+      return image.to_blob { self.quality = options[:quality] if options[:quality] }
     rescue => e
       return nil
     end
@@ -93,34 +96,6 @@ class Sys::Lib::Mail::Attachment
   
   def eng_unit
     return @eng_unit if @eng_unit
-    
-    size = @size
-    return '' unless size.to_s =~ /^[0-9]+$/
-    if size >= 10**9
-      _kilo = 3
-      _unit = 'G'
-    elsif size >= 10**6
-      _kilo = 2
-      _unit = 'M'
-    elsif size >= 10**3
-      _kilo = 1
-      _unit = 'K'
-    else
-      _kilo = 0
-      _unit = ''
-    end
-    
-    if _kilo > 0
-      size = (size.to_f / (1024**_kilo)).to_s + '000'
-      _keta = size.index('.')
-      if _keta == 3
-        size = size.slice(0, 3)
-      else
-        size = size.to_f * (10**(3-_keta))
-        size = size.to_f.ceil.to_f / (10**(3-_keta))
-      end
-    end
-    
-    @eng_unit = "#{size}#{_unit}Bytes"
+    @eng_unit = "#{Util::Unit.eng_unit(@size, "Bytes")}"
   end
 end

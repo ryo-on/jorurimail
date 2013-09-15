@@ -11,9 +11,9 @@ protected
       return false
     end
     if request.mobile?
-      expiration = Application.config(:session_expiration_for_mobile, 1)
+      expiration = Joruri.config.application['sys.session_expiration_for_mobile']
     else
-      expiration = Application.config(:session_expiration, 24*3)
+      expiration = Joruri.config.application['sys.session_expiration']
     end
     session[:expired_at] = Time.now + expiration.hours
     current_user != false
@@ -28,7 +28,7 @@ protected
   
   def new_login_mobile(_account, _password, _mobile_password)
     if user = Sys::User.authenticate(_account, _password)
-      if user.mobile_access == 1 && !user.mobile_password.to_s.empty? && user.mobile_password == _mobile_password
+      if user.authenticate_mobile_password(_mobile_password)
         set_current_user(user)
         return true
       end
@@ -46,12 +46,21 @@ protected
   end
   
   def current_user
-    return @@current_user if @@current_user
-    return false if (!session[ACCOUNT_KEY] || !session[PASSWD_KEY])
-    unless user = Sys::User.authenticate(session[ACCOUNT_KEY], session[PASSWD_KEY], true)
-      return false
+    unless @@current_user
+      return false if (!session[ACCOUNT_KEY] || !session[PASSWD_KEY])
+      unless user = Sys::User.authenticate(session[ACCOUNT_KEY], session[PASSWD_KEY], true)
+        return false
+      end
+      @@current_user = user
     end
-    @@current_user = user
+    
+    def @@current_user.save(*args)
+      error_log('current user could not save.')
+    end
+    def @@current_user.save!(*args)
+      error_log('current user could not save.')
+    end
+    return @@current_user 
   end
   
   # Check if the user is authorized.

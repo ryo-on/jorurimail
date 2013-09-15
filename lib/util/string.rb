@@ -28,12 +28,15 @@ module Util::String
   def self.text_to_html(text)
     rslt = ''
     text.each_line do |line|
-      line.chop!
+      line.chomp!
+      line.gsub!(/&/, '&amp;')
+      line.gsub!(/</, '&lt;')
+      line.gsub!(/>/, '&gt;')
       line.gsub!(/(\s+)\s/) do |m|
         '&nbsp;' * m.length
       end
-      line << '&nbsp;' if line.blank?
-      rslt << %Q(<div>#{line}</div>\n)
+      #line << '&nbsp;' if line.blank?
+      rslt << %Q(<p style="margin:0px; padding:0px;">#{line}</p>\n)
     end
     rslt
   end

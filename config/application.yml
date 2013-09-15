@@ -1,21 +1,25 @@
-webmail:
+sys:
   # ログイン画面フッター文字
   login_footer: ''
   # 携帯向けフッター文字
   mobile_footer: ''
-  # メールボックス容量最大サイズ（MB）
-  mailbox_quota_max_size: 300
-  # メールボックス容量警告サイズ（MB）
-  mailbox_quota_alert_size: 250
-  # 添付ファイル最大サイズ（MB）
-  attachment_file_max_size: 5
   # セッション保持期限（H）
-  session_expiration: 72
+  session_expiration: 24
   # 携帯向けセッション保持期限（H）
   session_expiration_for_mobile: 1
   # 携帯向けサイト強制表示
   force_mobile_site: 0
+  
+webmail:
+  # メールボックス容量警告使用割合
+  mailbox_quota_alert_rate: 0.85
+  # 添付ファイル最大サイズ（MB）
+  attachment_file_max_size: 5
   # 組織アドレス帳名
   sys_address_menu: "組織アドレス帳"
   # 組織アドレス帳/LDAPユーザーのみ表示
   show_only_ldap_user: 0
+  # フィルタ条件最大登録件数
+  filter_condition_max_count: 100
+  # メール送信先履歴最大保持件数
+  mail_address_history_max_count: 200

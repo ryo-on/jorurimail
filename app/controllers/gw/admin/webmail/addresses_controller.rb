@@ -133,14 +133,14 @@ class Gw::Admin::Webmail::AddressesController < Gw::Controller::Admin::Base
     end
     
     begin
+      read_data = ""
       @csv = CSV.generate(:encoding => 'utf-8') do |csv|
         
         csv << header
         
-        read_data = NKF.nkf('-w --cp932 -Lu', params[:import_file].read)
+        read_data = NKF.nkf('-m0 -wx -Lu', params[:import_file].read)
         
         CSV.parse(read_data, :headers => true) do |data|
-          
           data = conv_data.call(data)
           check = check_data.call(data)
           csvline = make_csv_rec.call(header, data, check)
@@ -155,7 +155,11 @@ class Gw::Admin::Webmail::AddressesController < Gw::Controller::Admin::Base
           csv << csvline
         end
       end
-    rescue CSV::MalformedCSVError
+    rescue CSV::MalformedCSVError => e
+      raise e
+    rescue ArgumentError => e
+      #error_log("#{e.class.name}: #{e.message} #{read_data}")
+      raise e
     end
   end
   
@@ -254,7 +258,8 @@ class Gw::Admin::Webmail::AddressesController < Gw::Controller::Admin::Base
       end
     end
     
-    send_data(NKF.nkf('-s -Lw', csv), :type => 'text/csv', :filename => "address_groups_#{Time.now.strftime("%Y%m%d_%H%M%S")}.csv")
+    csv = NKF.nkf('-m0 -sx -Lw', csv)
+    send_data(csv, :type => 'text/csv', :filename => "address_groups_#{Time.now.strftime("%Y%m%d_%H%M%S")}.csv" )
   end
   
 protected

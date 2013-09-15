@@ -52,10 +52,16 @@ Joruri::Application.configure do
   Joruri.config.imap_settings = {
     :address        => '192.168.0.4',
     :port           => 143,
-    :usessl         => false,
-    :ssh_address    => '',
-    :ssh_user_name  => '',
-    :ssh_password   => '',
-    :ssh_maildir    => '/home/#{account}/Maildir'
+    :usessl         => false
+  }
+  
+  # SSO
+  Joruri.config.sso_settings = {
+    :gw => {
+      :host        => 'localhost',
+      :port        => 80,
+      :usessl      => false,
+      :path        => 'api/air_sso'
+    }
   }
 end

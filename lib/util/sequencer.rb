@@ -1,6 +1,7 @@
 # encoding: utf-8
 class Util::Sequencer
   def self.next_id(name, options = {})
+    name    = name.to_s
     version = options[:version] || 0
     
     lock = "#{name}_#{version}"

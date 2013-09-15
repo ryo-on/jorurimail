@@ -18,10 +18,12 @@ class Gw::WebmailMailbox < ActiveRecord::Base
   end
   
   def self.imap_mailboxes
-    boxes = {:INBOX => [], :Drafts => [], :Sent => [], :Archives => [], :Trash => [], :Etc => []}
-    imap.list('', '*').sort {|a, b| a.name <=> b.name}.each do |box|
+    boxes = {:INBOX => [], :Drafts => [], :Sent => [], :Archives => [], :Trash => [], :Star => [], :Etc => []}
+    list  = imap.list('', '*')
+    list  = list.sort{|a, b| name_to_title(a.name).downcase <=> name_to_title(b.name).downcase}
+    list.each do |box|
       type = :Etc
-      [:INBOX, :Drafts, :Sent, :Archives, :Trash].each do |name|
+      [:INBOX, :Drafts, :Sent, :Archives, :Trash, :Star].each do |name|
         if box.name =~ /^#{name.to_s}(\.|$)/
           type = name
           break
@@ -29,7 +31,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
       end
       boxes[type] <<  box
     end
-    boxes[:INBOX] + boxes[:Drafts] + boxes[:Sent] + boxes[:Archives] + boxes[:Etc] + boxes[:Trash]
+    boxes[:INBOX] + boxes[:Star] + boxes[:Drafts] + boxes[:Sent] + boxes[:Archives] + boxes[:Etc] + boxes[:Trash]
   end
   
   def self.load_mailbox(mailbox)
@@ -62,17 +64,33 @@ class Gw::WebmailMailbox < ActiveRecord::Base
       else
         reload = :all
       end
+    elsif reload.class == Array
+      if reload.index(:all)
+        reload = :all
+      else
+        reload.each do |boxname|
+          if box = find(:first, :conditions => {:user_id => Core.user.id, :name => boxname})
+            status = imap.status(boxname, ['MESSAGES', 'UNSEEN', 'RECENT'])
+            box.messages = status['MESSAGES']
+            box.unseen   = status['UNSEEN']
+            box.recent   = status['RECENT']
+            box.save
+          end
+        end
+        reload = nil
+      end
     end
     
     boxes = find(:all, :conditions => {:user_id => Core.user.id}, :order => :sort_no)
     return boxes if reload == nil && boxes.size > 0
     
-    need = ['Drafts', 'Sent', 'Archives', 'Trash']
+    need = ['Drafts', 'Sent', 'Archives', 'Trash', 'Star']
     (imap_boxes = imap_mailboxes).each do |box|
       need.delete('Drafts')   if box.name == 'Drafts'
       need.delete('Sent')     if box.name == 'Sent'
       need.delete('Trash')    if box.name == 'Trash'
       need.delete('Archives') if box.name == 'Archives'
+      need.delete('Star')     if box.name == 'Star'
     end
     if need.size > 0
       need.each {|name| imap.create(name) }
@@ -106,6 +124,51 @@ class Gw::WebmailMailbox < ActiveRecord::Base
     return find(:all, :conditions => {:user_id => Core.user.id}, :order => :sort_no)
   end
   
+  def self.load_starred_mails(mailbox_uids = nil)
+    return if mailbox_uids == nil
+    
+    imap.create('Star') unless imap.list('', 'Star')
+    
+    imap.select('Star') rescue return
+    unstarred_uids = imap.uid_search(['UNDELETED', 'UNFLAGGED'])
+    num = imap.uid_store(unstarred_uids, '+FLAGS', [:Deleted]).size rescue 0
+    imap.expunge if num > 0
+    
+    Gw::WebmailMailNode.delete_nodes('Star', unstarred_uids) if num > 0
+    
+    mailbox_uids.each do |mailbox, uids|
+      next if mailbox =~ /^(Star)$/
+      
+      current_starred_uids = Gw::WebmailMailNode.find_ref_nodes(mailbox).map{|x| x.ref_uid}
+      
+      imap.select(mailbox) rescue next
+      if uids.empty? || uids.include?('all') ||  uids.include?(:all)
+        new_starred_uids = imap.uid_search(['UNDELETED', 'FLAGGED'])
+      else
+        new_starred_uids = imap.uid_search(['UID', uids, 'UNDELETED', 'FLAGGED'])
+      end
+      new_starred_uids = new_starred_uids.select{|x| !current_starred_uids.include?(x) }
+      next if new_starred_uids.blank?
+      
+      imap.select('Star') rescue next
+      next_uid = imap.status('Star', ['UIDNEXT'])['UIDNEXT']
+      
+      imap.select(mailbox) rescue next
+      res = imap.uid_copy(new_starred_uids, 'Star') rescue next
+      next if res.name != 'OK'
+
+      # create cache
+      items = Gw::WebmailMail.fetch((next_uid..next_uid+new_starred_uids.size).to_a, 'Star', :use_cache => false)
+      items.each_with_index do |item, i|
+        if item.node
+          item.node.ref_mailbox = mailbox
+          item.node.ref_uid = new_starred_uids[i]
+          item.node.save
+        end
+      end
+    end
+  end
+  
   def self.name_to_title(name)
     name = Net::IMAP.decode_utf7(name)
     name = name.gsub(/^INBOX(\.|$)/, '受信トレイ\1')
@@ -113,26 +176,30 @@ class Gw::WebmailMailbox < ActiveRecord::Base
     name = name.gsub(/^Sent(\.|$)/, '送信トレイ\1')
     name = name.gsub(/^Trash(\.|$)/, 'ごみ箱\1')
     name = name.gsub(/^Archives(\.|$)/, 'アーカイブ\1')
+    name = name.gsub(/^Star(\.|$)/, 'スター付き\1')
     name
   end
   
   def self.load_quota(reload = nil)
-    conf = Joruri.config.imap_settings
-    return nil if conf[:ssh_address].blank?
-    
-    quota = {}
+    quota = nil
     cond  = {:user_id => Core.user.id, :name => 'quota_info'}
     st    = Gw::WebmailSetting.find(:first, :conditions => cond)
     
     if reload != :force
-      #試験的に、容量取得の回数を1/3にする。
       reload = nil if reload && rand(3) != 0
     end
     
     if !reload && !st.nil?
       begin
-        xml = REXML::Document.new(st.value)
-        xml.root.elements.each {|e| quota[e.name.intern] = e.text }
+        #xml = REXML::Document.new(st.value)
+        #xml.root.elements.each {|e| quota[e.name.intern] = e.text }
+        quota = Hash.from_xml(st.value)
+        if quota.values.length > 0
+          quota = quota.values[0].symbolize_keys
+          if quota[:mailboxes] && quota[:mailboxes].values.length > 0
+            quota[:mailboxes] = quota[:mailboxes].values[0].each {|x| x.symbolize_keys!}
+          end
+        end
       rescue => e
         return nil
       end
@@ -140,37 +207,64 @@ class Gw::WebmailMailbox < ActiveRecord::Base
     end
     
     begin
-      dir = conf[:ssh_maildir].gsub('#{account}', Core.user.account)
-      opt = {:password => conf[:ssh_password], :timeout => 1}
-      ssh = Net::SSH.start(conf[:ssh_address], conf[:ssh_user_name], opt)
-      uu  = ssh.exec!("sudo du -sh #{dir}").to_s.force_encoding('utf-8').gsub(/\n$/, '')
-      ub  = ssh.exec!("sudo du -sb #{dir}").to_s.force_encoding('utf-8').gsub(/\n$/, '')
-      raise "error: du -sh: #{uu}" if uu !~ /^[0-9]/ || uu.scan("\n").size != 0
-      raise "error: du -sb: #{ub}" if ub !~ /^[0-9]/ || ub.scan("\n").size != 0
-      
-      quota_max_size = Application.config(:mailbox_quota_max_size, 300).to_i
-      quota_alert_size = Application.config(:mailbox_quota_alert_size, 250).to_i
-      
-      quota[:total]       = "#{quota_max_size}M" + "B"
-      quota[:total_bytes] = quota_max_size * 1000 * 1000 ## margin
-      quota[:used]        = uu.gsub(/(\t| ).*/, '') + "B"
-      quota[:used_bytes]  = ub.gsub(/(\t| ).*/m, '')
-      quota[:usage_rate]  = sprintf('%.1f', quota[:used_bytes].to_f / quota[:total_bytes].to_f * 100).to_f
-      quota[:usage_rate]  = 100 if quota[:usage_rate] > 100
-      if (mt = quota[:used].match(/(.+)MB/)) && mt[1].to_i >= quota_alert_size
-        usable = quota_max_size - mt[1].to_i
-        usable = 0 if usable < 0
-        quota[:usable] = "#{usable}MB" 
+      res = imap.getquotaroot('INBOX')[1] # sample: "" (STORAGE 258334 307200 MESSAGES 3145 10000)
+      if m = res.match(/\(STORAGE ([0-9]+) ([0-9]+).*/)
+        quota_bytes      = m[1].to_i*1024
+        max_quota_bytes  = m[2].to_i*1024
+        warn_quota_bytes = max_quota_bytes * Joruri.config.application['webmail.mailbox_quota_alert_rate'].to_f
+        #messages         = m[3].to_i
+        #max_messages     = m[4].to_i
+        
+        quota = {}
+        quota[:total_bytes] = max_quota_bytes
+        quota[:total]       = Util::Unit.eng_unit(max_quota_bytes).gsub(/\.[0-9]+/, '')
+        quota[:used_bytes]  = quota_bytes
+        quota[:used]        = Util::Unit.eng_unit(quota_bytes).gsub(/\.[0-9]+/, '')
+        quota[:usage_rate]  = sprintf('%.1f', quota_bytes.to_f / max_quota_bytes.to_f * 100).to_f
+        if quota_bytes > warn_quota_bytes
+          quota[:usable] = Util::Unit.eng_unit(max_quota_bytes - quota_bytes).gsub(/\.[0-9]+/, '') 
+        end
       end
+      
+#      ud = ssh.exec!("sudo du -b --max-depth=1 #{dir}").to_s.force_encoding('utf-8')
+#      raise "error: du -b --max-depth=1: #{ud}" if ud !~ /^[0-9]/
+#      
+#      ub = 0
+#      mailbox_used = {'INBOX' => 0}
+#      ud.each_line do |line|
+#        size, mailbox = line.chomp.split(/\t/)
+#        next if size.nil? || mailbox.nil?
+#        if mailbox == dir
+#          ub = size
+#        else
+#          mailbox = mailbox.gsub(/#{dir}\//, '')
+#          if mailbox =~ /^\./
+#            mailbox_used[mailbox.gsub(/^\./, '')] = size.to_i
+#          else
+#            mailbox_used['INBOX'] += size.to_i
+#          end
+#        end
+#      end
+#      
+#      mailbox_used.each do |key, val|
+#        mailbox_used[key] = Util::Unit.eng_unit(val)
+#      end
+      
+#      quota[:mailboxes] = []
+#      mailbox_used.each_pair do |name, used|
+#        quota[:mailboxes] << {:name => name, :used => used}
+#      end
     rescue => e
+      error_log("#{e}: #{res}")
       quota = nil
-    ensure
-      ssh.close if ssh && !ssh.closed?
     end
     
-    st ||= Gw::WebmailSetting.new(cond)
-    st.value = quota ? quota.to_xml(:dasherize => false,:skip_types => true, :root => 'item') : nil
-    st.save(:validate => false)
+    if quota
+      st ||= Gw::WebmailSetting.new(cond)
+      st.value = quota.to_xml(:dasherize => false, :skip_types => true, :root => 'item')
+      st.save(:validate => false)
+    end
+    
     return quota
   end
   
@@ -219,6 +313,14 @@ class Gw::WebmailMailbox < ActiveRecord::Base
     when :all      ; name =~ /^Trash(\.|$)/
     when :children ; name =~ /^Trash\./
     else           ; name == "Trash"
+    end
+  end
+  
+  def star_box?(target = :self)
+    case target
+    when :all      ; name =~ /^Star(\.|$)/
+    when :children ; name =~ /^Star\./
+    else           ; name == "Star"
     end
   end
   

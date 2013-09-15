@@ -8,37 +8,11 @@
 
 <%= form_for :item, :url => mobile_manage_gw_webmail_mails_path(@mailbox.name), :html => {:id => "mailForm", :name => "mailForm", :class => "mailForm"} do |f| %>
 <input type="hidden" name="page" value="<%=h params[:page] %>" />
-
-<div class="mailItems">
-<% for item in @items
-  flag  = (item.answered?) ? "answered" : ""
-  flag += "forwarded" if item.forwarded?
-  mdnRequest = item.has_disposition_notification_to? ? 'mdnRequest' : ''
-  from_tooltip = value = truncate(item.subject, :length => 30)
-  s_from = from = item.friendly_from_addr
-  if @mailbox.name =~ /^(Sent|Drafts)(\.|$)/
-    from = item.simple_to_addr
-    s_from = item.friendly_to_addrs[0] || ''
-  end 
-  from, from_tooltip = omit_from_address_in_mail_list(from)
-  value = ' ' if value.blank? 
-  if match = item.date.match(/\d{4}-(\d{2})-(\d{2})\s\d{2}:\d{2}/)
-    mon = match[1].to_i
-    day = match[2].to_i
-  end 
-  %>
-  <div class="mailItem<%= ' unseen' if item.unseen? %>">
-    <input type="checkbox" name="item[ids][<%= item.uid %>]" value="1" 
-    /><font class="subject <%= flag %> <%= mdnRequest %>"><%= link_to mail_text_wrap(value,1000), url_for(:action => :show, :id => item.uid) %></font>
-    <% if item.has_attachments? %>
-    <img src="/_common/themes/admin/gw/webmail/mobile/images/clip.jpg" alt="[有]">
-    <% end %>
-    <br />
-    　 <font class="date"><%= "#{mon}/#{day}" %></font>
-    <font class="from"><%= mail_text_wrap(from.gsub(/["']/, ""),1000) %></font><br />
-  </div>
+<% if params[:sort_starred] == '1' %>
+  <%= render :partial => 'mail_list_mobile', :locals => {:items => @starred_items + @unstarred_items} %>
+<% else %>
+  <%= render :partial => 'mail_list_mobile', :locals => {:items => @items} %>
 <% end %>
-</div>
 
 <div class="pagination">
 <%= paginate @items, :page_links => false %>

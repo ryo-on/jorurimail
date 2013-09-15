@@ -29,6 +29,22 @@ class Sys::Lib::Ldap::User < Sys::Lib::Ldap::Entry
   
   ## Attribute: kana
   def kana
-    get(:cn, 1)
+    #get(:cn, 1)
+    "#{get('cn;lang-ja;phonetic')}"
+  end
+  
+  ## Attribute: sort_no
+  def sort_no
+    get(:departmentNumber)
+  end
+
+  ## Attribute: official_position
+  def official_position
+    get(:title)
+  end
+  
+  ## Attribute: assigned_job
+  def assigned_job
+    get(:employeeType)
   end
 end

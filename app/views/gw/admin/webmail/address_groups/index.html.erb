@@ -118,9 +118,9 @@ function showAddresses(request, gid, gname) {
   html += '<th class="checkUI"><a onmousedown="checkAll(\'to\' , \'' + gid + '\');" onclick="return false;" href="#" title="TO">TO</a></th>';
   html += '<th class="checkUI"><a onmousedown="checkAll(\'cc\' , \'' + gid + '\');" onclick="return false;" href="#" title="CC">CC</a></th>';
   html += '<th class="checkUI"><a onmousedown="checkAll(\'bcc\', \'' + gid + '\');" onclick="return false;" href="#" title="BCC">BCC</a></th>';
-  html += '<th style="width: 30%;"><a id="nameCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'name\'); return false;">名前</a></th>';
-  html += '<th style="width: 20%;"><a id="kanaCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'kana\'); return false;">フリガナ</a></th>';
-  html += '<th style="width: ;"><div class="email"><a id="emailCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'email\'); return false;">メールアドレス</a></div><div class="sortNo">並び順</div></th>';
+  html += '<th style="width: 30%;"><a class="sorter" id="nameCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'name\'); return false;">名前</a></th>';
+  html += '<th style="width: 20%;"><a class="sorter" id="kanaCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'kana\'); return false;">フリガナ</a></th>';
+  html += '<th style="width: ;"><div class="email"><a class="sorter" id="emailCaption' + gid + '" href="#" onclick="sortAddresses(\'' + gid + '\', \'email\'); return false;">メールアドレス</a></div><div class="sortNo">並び順</div></th>';
   html += '</tr>';
   
   var items = request.responseXML.getElementsByTagName("item");
@@ -172,12 +172,18 @@ function setNextSortOrder(gid, key) {
   var emailNode = $('emailCaption' + gid);
   var order = "▲";
   if (!nameNode || !kanaNode || !emailNode || !keyNode) return order;
-  order = nextSortOrder(keyNode.innerText);
-  nameNode.innerText = nameNode.innerText.replace("▲","").replace("▼","");
-  kanaNode.innerText = kanaNode.innerText.replace("▲","").replace("▼","");
-  emailNode.innerText = emailNode.innerText.replace("▲","").replace("▼","");
-  keyNode.innerText += order;
+  order = nextSortOrder(keyNode.innerHTML);
+  nameNode.innerHTML = nameNode.innerHTML.replace("▲","").replace("▼","");
+  kanaNode.innerHTML = kanaNode.innerHTML.replace("▲","").replace("▼","");
+  emailNode.innerHTML = emailNode.innerHTML.replace("▲","").replace("▼","");
+  keyNode.innerHTML += order;
   return order;
+}
+function getInnerText(elm) {
+  if ('textContent' in  elm) {
+    return elm.textContent;
+  }
+  return elm.innerText;
 }
 function sortAddresses(gid, key) {
   var tbodyNode = getTbodyNode(gid);
@@ -192,9 +198,9 @@ function sortAddresses(gid, key) {
     if (children.length >= 6) {
       var hash = new Hash();
       hash.node = node;
-      hash.name = children[3].innerText;
-      hash.kana = children[4].innerText;
-      hash.email = children[5].innerText;
+      hash.name = getInnerText(children[3]);
+      hash.kana = getInnerText(children[4]);
+      hash.email = getInnerText(children[5]);
       clones.push(hash);
     }
     node.parentNode.removeChild(node);
@@ -267,9 +273,9 @@ end
         <th class="checkUI"><a onmousedown="return checkAll('to' , '0');" onclick="return false;" href="#" title="TO">TO</a></th>
         <th class="checkUI"><a onmousedown="return checkAll('cc' , '0');" onclick="return false;" href="#" title="CC">CC</a></th>
         <th class="checkUI"><a onmousedown="return checkAll('bcc', '0');" onclick="return false;" href="#" title="BCC">BCC</a></th>
-        <th style="width: 30%;"><a id="nameCaption0" href="#" onclick="sortAddresses('0', 'name'); return false;">名前</a></th>
-        <th style="width: 20%;"><a id="kanaCaption0" href="#" onclick="sortAddresses('0', 'kana'); return false;">フリガナ</a></th>
-        <th style="width: ;"><div class="email"><a id="emailCaption0" href="#" onclick="sortAddresses('0', 'email'); return false;">メールアドレス</a></div><div class="sortNo">並び順</div></th>
+        <th style="width: 30%;"><a class="sorter" id="nameCaption0" href="#" onclick="sortAddresses('0', 'name'); return false;">名前</a></th>
+        <th style="width: 20%;"><a class="sorter" id="kanaCaption0" href="#" onclick="sortAddresses('0', 'kana'); return false;">フリガナ</a></th>
+        <th style="width: ;"><div class="email"><a class="sorter" id="emailCaption0" href="#" onclick="sortAddresses('0', 'email'); return false;">メールアドレス</a></div><div class="sortNo">並び順</div></th>
       </tr>
       <% @s_items.each do |u| %>
       <tr <%= cycle '', 'class="cycle"' %>>
@@ -296,9 +302,9 @@ end
         <th class="checkUI"><a onmousedown="checkAll('to' , 'All');" onclick="return false;" href="#" title="TO">TO</a></th>
         <th class="checkUI"><a onmousedown="checkAll('cc' , 'All');" onclick="return false;" href="#" title="CC">CC</a></th>
         <th class="checkUI"><a onmousedown="checkAll('bcc', 'All');" onclick="return false;" href="#" title="BCC">BCC</a></th>
-        <th style="width: 30%;"><a id="nameCaptionAll" href="#" onclick="sortAddresses('All', 'name'); return false;">名前</a></th>
-        <th style="width: 20%;"><a id="kanaCaptionAll" href="#" onclick="sortAddresses('All', 'kana'); return false;">フリガナ</a></th>
-        <th style="width: ;"><div class="email"><a id="emailCaptionAll" href="#" onclick="sortAddresses('All', 'email'); return false;">メールアドレス</a></div><div class="sortNo">並び順</div></th>
+        <th style="width: 30%;"><a class="sorter" id="nameCaptionAll" href="#" onclick="sortAddresses('All', 'name'); return false;">名前</a></th>
+        <th style="width: 20%;"><a class="sorter" id="kanaCaptionAll" href="#" onclick="sortAddresses('All', 'kana'); return false;">フリガナ</a></th>
+        <th style="width: ;"><div class="email"><a class="sorter" id="emailCaptionAll" href="#" onclick="sortAddresses('All', 'email'); return false;">メールアドレス</a></div><div class="sortNo">並び順</div></th>
       </tr>
       <% @items.each do |u| %>
       <tr <%= cycle '', 'class="cycle"' %>>

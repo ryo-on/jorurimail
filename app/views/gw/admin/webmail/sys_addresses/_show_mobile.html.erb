@@ -1,4 +1,4 @@
-<div class="groups"><%= Application.menu(:sys_address_menu) %></div>
+<div class="groups"><%= Joruri.config.application['webmail.sys_address_menu'] %></div>
 <div class="sysUser">
 <div class="showItem">
   <font class="title"><%= '所属部署' %></font>
@@ -11,6 +11,14 @@
 <div class="showItem">
   <font class="title"><%= @item.locale(:kana) %></font>
   <font class="value"><%= @item.kana %></font>
+</div>
+<div class="showItem">
+  <font class="title"><%= @item.locale(:official_position) %></font>
+  <font class="value"><%= @item.official_position %></font>
+</div>
+<div class="showItem">
+  <font class="title"><%= @item.locale(:assigned_job) %></font>
+  <font class="value"><%= @item.assigned_job %></font>
 </div>
 <div class="showItem">
   <font class="title"><%= @item.locale(:email) %></font>

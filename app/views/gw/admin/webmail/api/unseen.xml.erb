@@ -1,13 +1,4 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<response>
-  <account><%= @account %></account>
+<item>
   <unseen><%= @unseen %></unseen>
-  <mailboxes>
-    <% @mailboxes.each do |box| %>
-    <mailbox>
-      <title><%= box.title %></title>
-      <unseen><%= box.unseen %></unseen>
-    </mailbox>
-  <% end %>
-  </mailboxes>
-</response>
+</item>

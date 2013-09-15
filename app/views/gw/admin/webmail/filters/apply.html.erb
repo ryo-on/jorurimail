@@ -2,7 +2,7 @@
 
 mailboxes = []
 Gw::WebmailMailbox.load_mailboxes.each do |box|
-  next if box.name =~ /^(Drafts|Sent|Trash)(\.|$)/
+  next if box.name =~ /^(Drafts|Sent|Trash|Star)(\.|$)/
   mailboxes << [box.slashed_title, "#{box.name}"]
 end
 

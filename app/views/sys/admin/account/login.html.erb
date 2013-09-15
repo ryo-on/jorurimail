@@ -28,7 +28,7 @@
   </div>
 
   <% 
-    footer = Application.config(:login_footer, "")
+    footer = Joruri.config.application['sys.login_footer']
     if footer == ""
       submitter_style = "margin-top:14px"
     end

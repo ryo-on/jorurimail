@@ -42,8 +42,8 @@ function addressSelectorCallBack(ok, to, cc, bcc) {
 </table>
 
 <div id="openAddress" style="margin-top:10px">
-  <a href="#" id="sys_openAddressButton" onclick="return startAddressSelection('sys');"><%= Application.menu(:sys_address_menu) %></a>
-  <a href="#" id="pri_openAddressButton" onclick="return startAddressSelection('pri');"><%= Application.menu(:address_group_menu) %></a>
+  <a href="#" id="sys_openAddressButton" onclick="return startAddressSelection('sys');"><%= Joruri.config.application['webmail.sys_address_menu'] %></a>
+  <a href="#" id="pri_openAddressButton" onclick="return startAddressSelection('pri');"><%= Joruri.config.application['webmail.address_group_menu'] %></a>
 </div>
 
 <%= render :partial => "gw/admin/webmail/mails/address_selector" %>

@@ -3,15 +3,23 @@
 /* Init.
 ----------------------------------------------- */
 body#tinymce {
-  margin: 10px;
+  margin: 0px;
+  padding: 5px;
   font-size: 80%;
 }
 body, td, th, select, option {
-  font-family: "MS PGothic", "ＭＳ Ｐゴシック", Arial, Verdana, Osaka, sans-serif;
+  font-family: "ＭＳ ゴシック", "MS Gothic", Osaka, Terminal, sans-serif;
   font-weight: lighter; 
 }
 td, th {
   font-size: 100%;
+}
+ul, ol {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+li {
+  line-height: 1.2;
 }
 
 /* Icon.

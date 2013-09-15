@@ -42,8 +42,8 @@ module Gw::Model::Ext::WebmailNode
     return super(to_mailbox)
   end
   
-  def destroy
+  def destroy(complete = false)
     @node.destroy if @node
-    return super()
+    return super(complete)
   end
 end

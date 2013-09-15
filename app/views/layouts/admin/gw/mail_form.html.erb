@@ -16,6 +16,7 @@
 <%= stylesheet_link_tag '/_common/themes/admin/gw/webmail/style', :media => 'all' %>
 <%= stylesheet_link_tag '/_common/themes/admin/gw/print', :media => 'print' %>
 <%= javascript_tag "new Navigation({});" %>
+<%= yield :header %>
 </head>
 <body><a id="top" name="top"></a>
 <%
@@ -30,7 +31,8 @@ end
 
 <div id="main">
 
-<% if flash[:notice] %><div class="notice"><%= flash[:notice] %></div><% end %>
+<%= render :partial => 'layouts/admin/gw/notice' %>
+<%= render :partial => 'layouts/admin/gw/error' %>
 
 <div id="content">
 <div id="contentContainer">

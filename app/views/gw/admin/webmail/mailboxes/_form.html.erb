@@ -2,7 +2,7 @@
 
 path_options = []
 @mailboxes.each do |box|
-  next if box.name =~ /^(Drafts|Trash)(\.|$)/
+  next if box.name =~ /^(Drafts|Trash|Star)(\.|$)/
   path_options << [box.slashed_title, "#{box.name}."]
 end
 

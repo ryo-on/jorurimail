@@ -18,7 +18,7 @@ function handleMdnRequest() {
     $('mdnRequest').show();
   }
 }
-    
+
 window.onload = function() {
   var menus = [];
   if ($('answerLink')) menus.push('answerMenu');
@@ -27,12 +27,24 @@ window.onload = function() {
   handleMdnRequest();
   //<% if html_mail %>
     toggleView('<%= @html_mail_view %>');
-  //<% end %>  
+  //<% end %>
+  //<% if @new_window && @seen_flagged %>
+  if (window.opener) {
+    window.opener.removeUnseenClass('<%=raw escape_javascript @mailbox.name %>', '<%= @item.uid %>');
+    //<% if @mailbox.star_box? %>
+      //<% if @item.node && @item.node.ref_mailbox %>
+        window.opener.removeUnseenClass('<%=raw escape_javascript @item.node.ref_mailbox %>', '');
+      //<% end %>
+    //<% elsif @item.starred? %>
+      window.opener.removeUnseenClass('Star', '');
+    //<% end %> 
+  }
+  //<% end %>
 };
 
 window.onbeforeunload = function() {
- var reqElm = $('handleMdnRequest');
-  if(reqElm && reqElm.value == 'manual') {
+ var reqElm = $('mdnRequest');
+  if(reqElm && reqElm.style.display != 'none') {
     return "開封確認メールが送信されていません。";
   }
 } 
@@ -65,12 +77,12 @@ function toggleView(type) {
     var htmlElm = $('htmlPreview_' + idx);   
     if (htmlElm) {
       switch(type) {
-      case 'text': 
+      case 'text':
         if (!textElm.visible()) textElm.show();
         if (htmlElm.visible()) htmlElm.hide();
         htmlElm.innerHTML = '';        
         break;
-      case 'html':    
+      case 'html':
         if (textElm.visible()) textElm.hide();
         if (!htmlElm.visible()) htmlElm.show();
         htmlElm.innerHTML = $('htmlBody_' + idx).value;
@@ -82,7 +94,7 @@ function toggleView(type) {
   case 'text':
     if (alertElm.visible()) alertElm.hide();
     break;
-  case 'html':		
+  case 'html':
     if (!$('showHtmlImage').value) {
       if (!alertElm.visible()) alertElm.show();
     }
@@ -98,19 +110,24 @@ function sendMdn() {
     method: 'POST',
     parameters : {'send_mode':send_mode},
     onSuccess: function(request) {
+      //alert("開封確認メールを送信しました。");
     },
     onFailure: function(request) {
       alert("開封確認メールの送信に失敗しました。");
+      showMdnRequest();
     },
     onException : function(request, e)  {
       alert("開封確認メールの送信中にエラーが発生しました\n" + e.message);
+      showMdnRequest();
     }
   });
 }
   
 function hideMdnRequest() {
   $('mdnRequest').hide();
-  $('handleMdnRequest').value = '';
+}
+function showMdnRequest() {
+  $('mdnRequest').show();
 }
   
 function answerWithView(uri) {
@@ -161,6 +178,12 @@ function copyMail() {
   form.submit();
   form.removeChild(copy);
 }
+function registerSpam() {
+  if (confirm('迷惑メールに登録した後、ごみ箱に移動します。よろしいですか？')) {
+    $('mail').action = '<%= register_spam_gw_webmail_mails_path(:mailbox => @mailbox.name) %>';
+    $('mail').submit();
+  }
+}
 function showPopupMenu(btn, id) {
   var menu = PopupMenu.getMenu(id);
   menu.show(btn.offsetLeft, btn.offsetTop + btn.offsetHeight + 2);
@@ -183,7 +206,7 @@ function showHtmlImage() {
         if (hiddenElm) {
           hiddenElm.value = item.firstChild.nodeValue;
           htmlElm.innerHTML = hiddenElm.value; 
-        } 
+        }
       }
     },
     onFailure: function(request) {
@@ -195,6 +218,97 @@ function hideHtmlImage() {
   $('htmlSecurityAlert').hide();
   $('showHtmlImage').value = 'hide';  
 }
+
+function showThumbnailImage() {
+  if ($('showThumbnailArea').innerHTML) {
+    toggleThumbnail(true);
+    return;
+  }
+  var uri = '<%=raw escape_javascript gw_webmail_mail_path(:format => "xml", :show_thumbnail_image => 1) %>';
+  document.body.style.cursor = "wait";
+  var myAjax = new Ajax.Request(uri, {
+    method: 'get',
+    onSuccess: function(request) {
+      var html = request.responseText;
+      $('showThumbnailArea').innerHTML = html;
+      toggleThumbnail(true);
+    },
+    onFailure: function(request) {
+      alert('読み込みに失敗しました。');
+    },
+    onComplete: function(request) {
+      document.body.style.cursor = "default";
+    }
+  });
+}
+function hideThumbnailImage() {
+  toggleThumbnail(false);
+}
+function toggleThumbnail(showThumbnail) {
+  if (showThumbnail) {
+    $('showThumbnailArea').show();
+    $('showThumbnailButton').hide();
+    $('showNormalArea').hide();
+    $('showNormalButton').show();
+  } else {
+    $('showThumbnailArea').hide();
+    $('showThumbnailButton').show();
+    $('showNormalArea').show();
+    $('showNormalButton').hide();
+  }
+}
+
+function starMail(uid) {
+  var starElm = $('mail_star_' + uid);
+  var starMenu = $('starMenu');
+  var beforeState = starElm.className;
+  if (beforeState == 'loading') {
+    return false;
+  }
+  var beforeTitle = starElm.getAttribute('title');
+  starElm.className = 'loading';
+  var ajax = new Ajax.Request('<%=raw star_gw_webmail_mails_path(@mailbox.name) %>', {
+    method: 'get',
+    parameters: {
+      id: uid
+    },
+    onSuccess: function(request) {
+      var afterState = '';
+      if (beforeState == 'starOn') {
+        afterState = 'starOff';
+      } else {
+        afterState = 'starOn';
+      }
+      changeStarClass(uid, afterState);
+      if (window.opener) {
+        window.opener.changeStarClass(uid, afterState);
+      }
+    },
+    onFailure: function(request) {
+      alert('通信に失敗しました。');
+      starElm.className = beforeState;
+      starElm.setAttribute('title', beforeTitle);
+    }
+  });
+}
+function changeStarClass(uid, starClass) {
+  var starElm = $('mail_star_' + uid);
+  var starMenu = $('starMenu');
+  if (starElm && starMenu) {
+    starElm.className = starClass;
+    switch (starClass) {
+    case 'starOn':
+      starElm.setAttribute('title', 'スター');
+      starMenu.innerHTML = 'スターをはずす';
+      break;
+    case 'starOff':
+      starElm.setAttribute('title', '');
+      starMenu.innerHTML = 'スターを付ける';
+      break;
+    }
+  }
+}
+
 //]]>
 </script>
 <% if !@mdnRequest.blank? && !@item.draft? && @mailbox.name !~ /Sent(\.|$)/ %>
@@ -224,6 +338,7 @@ function hideHtmlImage() {
 </div>
 
 <%= render :partial => 'mailbox' %>
+<%= render :partial => 'mail_address_history' if @mail_address_history != 0 %>
 
 </div></td>
 <% end %>
@@ -233,10 +348,10 @@ function hideHtmlImage() {
   <div class="leftMenu" style="position:relative;">
     <% if @item.draft? %>
       <% unless @new_window %>
-      <%= link_to "≪一覧へ戻る", gw_webmail_mails_path(@mailbox.name), :class => "index"
+      <%= link_to "≪一覧へ戻る", gw_webmail_mails_path(@s_params.merge(:mailbox => @mailbox.name)), :class => "index"
       %><span class="separator">|</span
       ><% end %><%= link_to "編集", '#', :class => 'edit', :title => "編集", :target => '_blank',
-        :onclick => open_mail_form(edit_gw_webmail_mail_path(@mailbox.name, @item.uid))
+        :onclick => "return answerWithView('#{resend_gw_webmail_mail_path(@mailbox.name, @item.uid)}');"
       %><%= link_to "削除", url_for(:action => :destroy, :new_window => @new_window), :method => :delete, :class => :delete, :title => "削除"
       %><span class="separator">|</span
       ><%= link_to "その他", '#', :id => 'etcLink', :class => 'etc', :title => 'その他',
@@ -244,14 +359,14 @@ function hideHtmlImage() {
       %><%= link_to h("印刷"), "#print", :onclick => "window.print(); return false;", :class => 'print', :title => "印刷" %>
     <% else %>
       <% unless @new_window %>
-      <%= link_to "≪一覧へ戻る", gw_webmail_mails_path(@mailbox.name), :class => "index"
+      <%= link_to "≪一覧へ戻る", gw_webmail_mails_path(@s_params.merge(:mailbox => @mailbox.name)), :class => "index"
       %><span class="separator">|</span
       ><% end %><%= link_to "返信", '#', :id => 'answerLink', :class => 'answer', :title => "返信",
         :onclick => "return showPopupMenu(this, 'answerMenu');"
       %><%= link_to "転送", '#', :class => 'forward', :title => "転送", :target => '_blank',
         :onclick => "return answerWithView('#{forward_gw_webmail_mail_path(@mailbox.name, @item.uid)}');"
       %><%= link_to "編集", '#', :class => 'edit', :title => "編集", :target => '_blank',
-        :onclick => open_mail_form(resend_gw_webmail_mail_path(@mailbox.name, @item.uid)) if @mailbox.name =~ /^Sent(\.|$)/
+        :onclick => "return answerWithView('#{resend_gw_webmail_mail_path(@mailbox.name, @item.uid)}');" if @mailbox.name =~ /^Sent(\.|$)/
       %><%= link_to "移動", "#", :onclick => "$('mail').submit(); return false;", :class => 'move', :title => "移動"
       %><%= link_to "コピー", "#void", :onclick => "copyMail(); return false;", :class => 'copy', :title => "コピー"
       %><%= link_to "削除", url_for(:action => :destroy, :new_window => @new_window), :method => :delete, :class => :delete, :title => "削除"
@@ -272,13 +387,16 @@ function hideHtmlImage() {
     </div>
     <div id="etcMenu" class="popupMenu" style="display:none;width:100px">
       <div class="menuItem"><%= link_to "ローカル保存", {:download => "eml"} %></div>
+      <div class="menuItem"><%= link_to "ヘッダ表示", "?header=1", :target => "_blank" %></div>
       <div class="menuItem"><%= link_to "ソース表示", "?source=1", :target => "_blank" %></div>
+      <div class="menuItem"><%= link_to "迷惑メール登録", "#", :onclick => "registerSpam(); return false;" %></div>
+      <div class="menuItem"><%= link_to @item.starred? ? "スターをはずす" : "スターを付ける", "#", :id => 'starMenu', :onclick => "starMail('#{@item.uid}'); return false;" %></div>
     </div>
   </div>
   <div class="simplePagination">
-    <%= link_to "≪前", gw_webmail_mail_path(@mailbox.name, @pagination[:prev_uid], :new_window => @new_window) if @pagination[:prev_uid]
+    <%= link_to "≪前", url_for(@s_params.merge(:mailbox => @mailbox.name, :id => @pagination[:prev_uid], :new_window => @new_window)) if @pagination[:prev_uid]
     %><span><b><%= @pagination[:current_page] %></b>/<b><%= @pagination[:total_items] %></b></span
-    ><%= link_to "次≫", gw_webmail_mail_path(@mailbox.name, @pagination[:next_uid], :new_window => @new_window) if @pagination[:next_uid] %>
+    ><%= link_to "次≫", url_for(@s_params.merge(:mailbox => @mailbox.name, :id => @pagination[:next_uid], :new_window => @new_window)) if @pagination[:next_uid] %>
   </div>
 </div>
 
@@ -310,6 +428,11 @@ function hideHtmlImage() {
   <tr>
     <th>件名</th>
     <td class="subject autoWrap">
+      <%
+        star_class = @item.starred? ? "starOn" : "starOff"
+        star_title = @item.starred? ? "スター" : ""
+      %>
+      <a class="<%= star_class %>" id="mail_star_<%= @item.uid %>" title="<%= star_title %>" onclick="starMail('<%= @item.uid %>');"></a>
       <%= mail_text_wrap(@item.subject) %>
       <% if @item.has_attachments? %>
       <%= raw %Q(<a href="#attachments" class="attachmentMark" title="#{(@item.attachments.collect{|a| a.name}).join(', ')}">添付ファイル有り</a>) %>
@@ -353,8 +476,8 @@ function hideHtmlImage() {
 <div class="mailBody">
   <% if html_mail %>
     <div class="mailViewSelector">
-      <%= link_to h("HTML"), "#", :onclick => "toggleView('html');return false;", :class => 'htmlView', :title => "HTML表示" %>
       <%= link_to h("TEXT"), "#", :onclick => "toggleView('text');return false;", :class => 'textView', :title => "テキスト表示" %>
+      <%= link_to h("HTML"), "#", :onclick => "toggleView('html');return false;", :class => 'htmlView', :title => "HTML表示" %>
     </div>    
   <% end %>
   <div id="inlineContents">
@@ -363,33 +486,84 @@ function hideHtmlImage() {
     cls = idx > 0 ? "inlineContent" : ""
     %>
     <div id="inlineContent_<%= inline.seqno %>" class="<%= cls %>">
-      <% if inline.alternative? || inline.content_type == "text/html"%>
+      <% if ((inline.alternative? && !inline.html_body.blank?) || inline.content_type == "text/html") %>
         <div id="textBody_<%= inline.seqno %>" class="autoWrap mailBodyText" style="display:none;"><%= mail_text_wrap(inline.text_body, 10, :auto_link => true) %></div>
-        <div id="htmlPreview_<%= inline.seqno %>" style="display:none;"></div>
-        <input type="hidden" id="htmlBody_<%= inline.seqno %>" value="<%=h inline.html_body %>" />
+        <div id="htmlPreview_<%= inline.seqno %>" class="mailBodyText" style="display:none;"></div>
+        <input type="hidden" id="htmlBody_<%= inline.seqno %>" value="<%=h mail_html_autolink(inline.html_body) %>" />
       <% else %>
         <div id="textBody_<%= inline.seqno %>" class="autoWrap mailBodyText"><%= mail_text_wrap(inline.text_body, 10, :auto_link => true) %></div>
       <% end %>
     </div>
   <% end %>
   </div>
-  <% if @item.request_mdn? %>
-    <div class="recipientConfirm">[開封確認メッセージを送信]</div>
+  <%
+    if @mailbox.draft_box?(:all) || @mailbox.sent_box?(:all)
+      sent_mdn = @item.has_disposition_notification_to?
+    else
+      sent_mdn = @item.has_disposition_notification_to?# && @item.notified?
+    end
+  %>
+  <% if sent_mdn %>
+    <div id="mdnSent" class="recipientConfirm">[開封確認メッセージを送信]</div>
   <% end %>
 </div>
 
 <% if @item.has_attachments? %>
 <a name="attachments"></a><br />
+
+<table class="attachmentDownloader">
+  <tr>
+    <td class="title">添付ファイル</td>
+    <td class="actions">
+      <%= link_to '一括ダウンロード', url_for(:download => :all) %>
+    </td>
+  </tr>
+</table>
 <table class="mail attachments">
   <tr>
-    <th>添付ファイル</th>
-  </tr><tr>
-    <td>
+    <% if @mail_attachment_view != 'list' && @item.has_images? %>
+      <td class="thumbnailArea">
       <% @item.attachments.each do |at| %>
-      <%= link_to h("#{at.name}(#{at.eng_unit})"), url_for(:download => at.seqno, :size => at.size),
-        :target => (at.image? ? '_blank' : nil), :class => at.css_class %>
+        <% file_title = "#{at.name}(#{at.eng_unit})" %>
+        <% if at.image? %>
+          <span class="thumbnail">
+            <span class="box" title="<%= file_title %>">
+              <a class="box" href="<%= url_for(:download => at.seqno, :size => at.size) %>" target="_blank">
+                <% if thumbnail = thumbnail_for_embed(at, :width => 128, :height => 96) %>
+                  <img src="data:image/jpeg;base64,<%= thumbnail %>" class="image" alt="<%= file_title %>" title="<%= file_title %>" />
+                <% else %>
+                  <%= image_tag url_for(:download => at.seqno, :thumbnail => 1, :width => 128, :height => 96), :alt => file_title, :title => file_title %>
+                <% end %>
+              </a>
+            </span>
+            <span class="remarks">
+              <%= at.name %><br />
+              <a href="<%= url_for(:download => at.seqno, :size => at.size, :disposition => :attachment) %>" title="<%= file_title %>">ダウンロード</a> (<%= at.eng_unit %>)
+            </span>
+          </span>
+        <% else %>
+          <span class="thumbnail">
+            <span class="box" title="<%= file_title %>">
+              <a href="<%= url_for(:download => at.seqno, :size => at.size) %>" target="<%= (at.image? ? '_blank' : nil) %>" title="<%= file_title %>">
+                <span class="<%= at.css_class %>"><%= mail_text_wrap(at.name, 5) %></span>
+              </a>
+            </span>
+            <span class="remarks">
+              <%= at.name %><br />
+              <a href="<%= url_for(:download => at.seqno, :size => at.size, :disposition => :attachment) %>" title="<%= file_title %>">ダウンロード</a> (<%= at.eng_unit %>)
+            </span>
+          </span>
+        <% end %>
       <% end %>
-    </td>
+      </td>
+    <% else %>
+      <td id="normalArea">
+        <% @item.attachments.each do |at| %>
+          <%= link_to h("#{at.name}(#{at.eng_unit})"), url_for(:download => at.seqno, :size => at.size),
+            :target => (at.image? ? '_blank' : nil), :class => at.css_class %>
+        <% end %>
+      </td>
+    <% end %>
   </tr>
 </table>
 <% end %>
@@ -399,13 +573,13 @@ function hideHtmlImage() {
 <div class="menu">
   <div class="leftMenu">
     <% unless @new_window %>
-    <%= link_to "≪一覧へ戻る", gw_webmail_mails_path(@mailbox.name), :class => "index" %>
+    <%= link_to "≪一覧へ戻る", gw_webmail_mails_path(@s_params.merge(:mailbox => @mailbox.name)), :class => "index" %>
     <% end %>
   </div>
   <div class="simplePagination">
-    <%= link_to "≪前", gw_webmail_mail_path(@mailbox.name, @pagination[:prev_uid], :new_window => @new_window) if @pagination[:prev_uid]
+    <%= link_to "≪前", url_for(@s_params.merge(:id => @pagination[:prev_uid], :new_window => @new_window)) if @pagination[:prev_uid]
     %><span><b><%= @pagination[:current_page] %></b>/<b><%= @pagination[:total_items] %></b></span
-    ><%= link_to "次≫", gw_webmail_mail_path(@mailbox.name, @pagination[:next_uid], :new_window => @new_window) if @pagination[:next_uid] %>
+    ><%= link_to "次≫", url_for(@s_params.merge(:id => @pagination[:next_uid], :new_window => @new_window)) if @pagination[:next_uid] %>
   </div>
 </div>
 

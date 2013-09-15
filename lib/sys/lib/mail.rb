@@ -18,6 +18,10 @@ module Sys::Lib::Mail
     @mail.date.blank? ? nullif : @mail.date.strftime(format)
   end
   
+  def from_addr
+    extract_address_from_mail_list(friendly_from_addr)
+  end
+  
   def friendly_from_addr
     field = @mail.header[:from]
     field.value = correct_shift_jis(field.value)
@@ -73,7 +77,8 @@ module Sys::Lib::Mail
   def subject
     field = @mail.header[:subject]
     return 'no subject' if field.blank?
-    field.value = correct_shift_jis(field.value) 
+    field.value = correct_shift_jis(field.value)
+    field.value = correct_utf7(field.value)
     return decode(field.to_s) if field.to_s.encoding.name == 'UTF-8' rescue nil ##
     field.blank? ? 'no subject' : decode(field.value)
   rescue => e
@@ -103,7 +108,7 @@ module Sys::Lib::Mail
     inlines = inline_contents
     
     inlines.each do |content|
-      if !content.attachment? && (content.alternative? || content.content_type == "text/plain") 
+      if !content.attachment? && (content.alternative? || content.content_type == "text/plain" || content.content_type == "text/html") 
         @text_body = content.text_body
         break
       end
@@ -160,6 +165,16 @@ module Sys::Lib::Mail
   def has_attachments?
     pattern = /^multipart\/(mixed|related|report)$/
     search_multipart = Proc.new do |p, lv|
+      return true if p.mime_type =~ pattern || p.attachment?
+      p.parts.each {|c| search_multipart.call(c, lv + 1)} if p.multipart? && lv < @@search_contents_depth - 1
+    end
+    search_multipart.call(@mail, 0)
+    false
+  end
+  
+  def has_images?
+    pattern = /^image\/(gif|jpeg|png|bmp)$/
+    search_multipart = Proc.new do |p, lv|
       return true if p.mime_type =~ pattern
       p.parts.each {|c| search_multipart.call(c, lv + 1)} if p.multipart? && lv < @@search_contents_depth - 1
     end
@@ -192,9 +207,10 @@ module Sys::Lib::Mail
       if @mail.mime_type == "multipart/report" && i > 0
         p = extend_report_part(p, i + 1)
       end
-      attached_files.call(p, 1)
-    end if @mail.multipart? 
-        
+    end
+    
+    attached_files.call(@mail, 0)
+     
     attachments
   end
   
@@ -240,7 +256,7 @@ module Sys::Lib::Mail
       parent.parts.each do |p|
         if p.mime_type == "text/html" && !p.attachment?
           html ||= '' 
-          html += "<div>#{decode_html_part(p, options)}</div>"
+          html += "<p style=\"margin:0px; padding:0px;\">#{decode_html_part(p, options)}</p>"
         end
       end
       html
@@ -273,7 +289,8 @@ module Sys::Lib::Mail
           inlines << Sys::Lib::Mail::Inline.new(
             :seqno => inlines.size,
             :content_type => "text/plain",
-            :text_body => decode_text_part(p)) if lv == 0 && !p.multipart?       
+            :text_body => decode_text_part(p)
+          ) if lv == 0 && !p.multipart? && !p.attachment?
         end        
       end
       if p.multipart? && lv < @@search_contents_depth
@@ -295,7 +312,7 @@ module Sys::Lib::Mail
                 :seqno => inlines.size,
                 :content_type => "text/plain",
                 :text_body => text
-              )              
+              )
             end
           end
           unless html.blank?
@@ -306,7 +323,7 @@ module Sys::Lib::Mail
                 :seqno => inlines.size,
                 :content_type => "text/html",
                 :html_body => html
-              )              
+              )
             end
           end
         end
@@ -316,17 +333,34 @@ module Sys::Lib::Mail
     end
     
     search_inline.call(@mail, 0)
-        
+    
+    inlines.each do |inline|
+      if !inline.text_body && inline.html_body
+        inline.text_body = convert_html_to_text(inline.html_body)
+      end
+    end
+    
     @inline_contents = inlines
   end
   
 private
-  def decode(str)
-    ::NKF::nkf('-wx --cp932', str).gsub(/\0/, "")
+  def decode(str, charset = nil)
+    if charset && charset.downcase == 'unicode-1-1-utf-7'
+      str = Net::IMAP.decode_utf7(str.gsub(/\+([\w\+\/]+)-/, '&\1-'))
+    else
+      ::NKF::nkf('-wx --cp932', str).gsub(/\0/, "")
+    end
   end
   
   def correct_shift_jis(str)
     str = str.gsub(/(=\?)SHIFT-JIS(\?[BQ]\?.+?\?=)/i, '\1' + 'Shift_JIS' +'\2')
+  end
+  
+  def correct_utf7(str)
+    if match = str.match(/(=\?)unicode-1-1-utf-7(\?[BQ]\?)(.+?)(\?=)/i)
+      str = Net::IMAP.decode_utf7(match[3].gsub(/\+([\w\+\/]+)-/, '&\1-'))
+    end
+    str
   end
   
   def collect_addrs(fields)
@@ -359,7 +393,7 @@ private
     if format == :html
       om = Util::String.text_to_html(om)
       ome = Util::String.text_to_html(ome)
-      html = block_quote(html_body_for_edit.to_s.gsub(/\r\n/, "\n"))
+      html = html_body_for_edit.to_s.gsub(/\r\n/, "\n")
       "#{om}#{html}#{ome}"
     else
       "#{om}#{text_body.to_s.gsub(/\r\n/, "\n")}#{ome}"
@@ -367,14 +401,14 @@ private
   end
 
   def decode_text_part(part)
-    decode(part.body.decoded)
+    decode(part.body.decoded, part.charset)
   rescue => e
     "# read failed: #{e}"
   end
   
   def decode_html_part(part, options = {})
 
-    body = decode(part.body.decoded)
+    body = decode(part.body.decoded, part.charset)
     body, image_was_omited = secure_html_body(body, options)
     @html_image_was_omited ||= image_was_omited
     
@@ -392,7 +426,12 @@ private
 
       files.each_with_index do |f, idx|
         cid  = f.header['content-id'].value.gsub(/^<(.*)>$/, '\\1')
-        body = body.gsub(%Q(src="cid:#{cid}"), %Q(src="?filename=#{CGI::escape(f.filename)}&download=#{idx}"))
+        
+        if options[:embed_image] && (data = Base64.encode64(f.decoded)) && data.size < options[:embed_image_size_limit]
+          body = body.gsub(%Q(src="cid:#{cid}"), %Q(src="data:#{f.mime_type};base64,#{data}"))
+        else
+          body = body.gsub(%Q(src="cid:#{cid}"), %Q(src="?filename=#{CGI::escape(f.filename)}&download=#{idx}"))
+        end
       end
     end
     
@@ -442,6 +481,10 @@ private
           elm.remove_attribute('style')
         end
       end
+      if style = elm['style']
+        style.gsub!(/(\A|\s)((position|top|left|display)\s*:\s*\w+\s*;)/i, '\1')
+        elm.set_attribute('style', style)
+      end
       elm.attributes.to_hash.each do |k, v|
         elm.remove_attribute(k) if k =~ /^on/i          
       end
@@ -480,7 +523,7 @@ private
   end
 
   def block_quote(html)
-    %Q(<blockquote style="border-left:2px solid #ccc; margin: 0 0 0 5px; padding: 0 0 0 5px;">#{html}</blockquote>\n)
+    %Q(<blockquote style="margin: 2px 0px 2px 5px; padding: 0px 0px 0px 5px; border-left-style: solid; border-left-width: 2px; border-left-color: silver;">#{html}</blockquote>\n)
   end
 
   def decode_uuencode(body)
@@ -547,5 +590,25 @@ private
       end
     end    
   end
-
+  
+  def convert_html_to_text(html)
+    text = html.gsub(/[\r\n]/, "").gsub(/<br\s*\/?>/, "\n").gsub(/<[^>]*>/, "")
+    text = CGI.unescapeHTML(text).gsub(/&nbsp;/, " ")
+    text
+  end
+  
+  def extract_address_from_mail_list(from)
+    if from.match(/<(.+)>/)
+      from = $1
+    end
+    from
+  end
+  
+  def extract_addresses_from_mail_list(froms)
+    froms ||= ""
+    froms.split(/,/).map do |from|
+      extract_address_from_mail_list(from)
+    end
+  end
+  
 end

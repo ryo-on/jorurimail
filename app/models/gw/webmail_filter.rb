@@ -14,8 +14,11 @@ class Gw::WebmailFilter < ActiveRecord::Base
   attr_reader :applied
   
   validates_presence_of :user_id, :state, :name, :conditions_chain, :action
+  validates_numericality_of :sort_no, :greater_than_or_equal_to => 0, :only_integer => true
+  
   validate :validate_conditions
   validate :validate_mailbox
+  validate :validate_name
   
   after_save :save_conditions
   
@@ -57,6 +60,11 @@ class Gw::WebmailFilter < ActiveRecord::Base
     [["メールを移動する", "move"],["メールを削除する","delete"]]
   end
   
+  def state_label
+    states.each {|a| return a[0] if state == a[1].to_s }
+    nil
+  end
+  
   def action_label
     action_labels.each {|a| return a[0] if action == a[1].to_s }
     nil
@@ -85,14 +93,25 @@ class Gw::WebmailFilter < ActiveRecord::Base
   
   def apply(params)
     @applied = 0
+    applied_uids = []
     idx = 0
     params[:filter] = self
     uids = Gw::WebmailMail.find_uid(:all, :select => params[:select], :conditions => params[:conditions])
     while (filtered = uids[idx, NUMBER_OF_FILTERED_UIDS]) && filtered.size > 0
       params[:timeout].check 
-      @applied += self.class.apply_uids(filtered, params)
+      applied_uids += self.class.apply_uids(filtered, params)
       idx += filtered.size
     end
+    @applied = applied_uids.size
+    
+    starred_uids = Gw::WebmailMailNode.find_ref_nodes(params[:select], applied_uids).map{|x| x.uid}
+    Core.imap.select('Star')
+    num = Core.imap.uid_store(starred_uids, "+FLAGS", [:Deleted]).size rescue 0
+    Core.imap.expunge
+    if num > 0
+      Gw::WebmailMailNode.delete_nodes('Star', starred_uids)
+    end
+    
     return @applied
   end
 
@@ -132,7 +151,7 @@ class Gw::WebmailFilter < ActiveRecord::Base
   end
 
   def self.apply_uids(uids, params)
-    applied = 0
+    applied_uids = []
     matched = []
     mails = Gw::WebmailMail.fetch_for_filter(uids, params[:select])
 
@@ -201,11 +220,11 @@ class Gw::WebmailFilter < ActiveRecord::Base
         case m[:filter].action
         when "move"
           if Gw::WebmailMail.move_all(params[:select], m[:filter].mailbox, m[:uids])
-            applied += m[:uids].size
+            applied_uids += m[:uids]
           end
         when "delete"
           if Gw::WebmailMail.delete_all(params[:select], m[:uids])
-            applied += m[:uids].size
+            applied_uids += m[:uids]
           end
         end
       rescue => e
@@ -214,10 +233,57 @@ class Gw::WebmailFilter < ActiveRecord::Base
       end
     end
 
-    return applied
+    return applied_uids
   rescue => e
     error_log(e)
-    return 0
+    return []
+  end
+  
+  def last_condition
+    Gw::WebmailFilterCondition.find(:first, :conditions => {:filter_id => id}, :order => 'sort_no DESC')
+  end
+  
+  def self.register_spams(items)
+    cond = {
+      :user_id   => Core.user.id,
+      :name      => '* 迷惑メール',
+    }
+    unless filter = self.find(:first, :conditions => cond)
+      filter = self.new(cond)
+      filter.state = 'enabled'
+      filter.sort_no = 0
+      filter.conditions_chain = 'or'
+      filter.action = 'delete'
+      filter.mailbox = ''
+      filter.save(:validate => false)
+    end
+    
+    last_condition = filter.last_condition
+    next_sort_no = last_condition ? last_condition.sort_no + 1 : 0
+    
+    items.each_with_index do |item, i|
+      cond = {
+        :user_id   => Core.user.id,
+        :filter_id => filter.id,
+        :column    => 'from',
+        :inclusion => '<',
+        :value     => item.from_addr
+      }
+      unless Gw::WebmailFilterCondition.find(:first, :conditions => cond)
+        cond[:sort_no] = next_sort_no + i
+        fcond = Gw::WebmailFilterCondition.new(cond)
+        fcond.save(:validate => false)
+      end
+    end
+    
+    spam_max_count = Joruri.config.application['webmail.filter_condition_max_count'] 
+    
+    cond = {:user_id => Core.user.id, :filter_id => filter.id}
+    spam_count = Gw::WebmailFilterCondition.count(:all, :conditions => cond)
+    if spam_count > spam_max_count
+      del_items = Gw::WebmailFilterCondition.find(:all, :conditions => cond, :limit => spam_count - spam_max_count, :order => 'sort_no')
+      Gw::WebmailFilterCondition.delete_all(:id => del_items.map{|item| item.id})
+    end
   end
   
 protected
@@ -225,6 +291,15 @@ protected
     return true if !mailbox.blank?
     return true if action !~ /^(move)$/
     errors.add :mailbox, :empty
+  end
+  
+  def validate_name
+    if name_changed?
+      if (name_was == nil || name_was =~ /^[^*]/) && name =~ /^[*]/
+        errors.add :name, "の先頭文字は*以外を入力してください。"
+        name.gsub!(/^[*]+/, '')
+      end
+    end
   end
   
   def in_conditions

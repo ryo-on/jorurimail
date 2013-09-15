@@ -8,6 +8,8 @@ Joruri::Application.routes.draw do
 ###  match '*path.html.r.mp3'       => 'cms/public/talk#down_mp3'
 ###  match '*path.html.r.m3u'       => 'cms/public/talk#down_m3u'
 
+  root :to => 'gw/admin/webmail/mails#index', :mailbox => 'INBOX'
+  
   ## Admin
   match '_admin'                 => 'gw/admin/webmail/mails#index', :mailbox => 'INBOX'
 #  match '_admin'                 => 'sys/admin/front#index'
@@ -17,6 +19,7 @@ Joruri::Application.routes.draw do
   match '_admin/logout'          => 'sys/admin/account#logout'
   match '_admin/account.:format' => 'sys/admin/account#info'
   match '_admin/account'         => 'sys/admin/account#info'
+  match "_admin/sso"             => "sys/admin/account#sso"
   match '_admin/air_login'       => 'sys/admin/air#old_login'
   match '_admin/air_sso'         => 'sys/admin/air#login'
   match '_admin/cms'             => 'sys/admin/front#index'
@@ -29,8 +32,6 @@ Joruri::Application.routes.draw do
     load(file) if FileTest.exist?(file)
   end
 
-  root :to => redirect("/_admin")
-  
   ## Exception
   match '404.:format' => 'exception#index'
   match '*path'       => 'exception#index'

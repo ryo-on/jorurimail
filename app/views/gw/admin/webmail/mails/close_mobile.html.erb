@@ -18,7 +18,7 @@ else
 end
 %>
 
-<% unless flash[:notice] %>
+<% unless flash[:notice] || flash[:error] %>
 <div class="notice">メールの処理が完了しました。</div>
 
 <% if false %>

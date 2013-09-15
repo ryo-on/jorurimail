@@ -1,11 +1,11 @@
-## Joruri Mail v1.0.1 インストールマニュアル                2011.08.11
+## Joruri Mail v1.1.0 インストールマニュアル                2012.01.20
 
 **********************************************************************
  1 想定環境
 **********************************************************************
 
 [システム]
-OS         : CentOS 6.0
+OS         : CentOS 6.2
 Webサーバ  : Apache 2.2
 DBシステム : MySQL 5
 Ruby       : 1.9.2
@@ -72,7 +72,7 @@ iptablesを停止し、自動起動を無効にします。
 必要なパッケージをダウンロードします。
 
   # cd /usr/local/src
-  # wget http://joruri.org/download/jorurimail/jorurimail-1.0.1.tar.gz
+  # wget http://joruri.org/download/jorurimail/jorurimail-1.1.0.tar.gz
   # wget ftp://ftp.ruby-lang.org/pub/ruby/1.9/ruby-1.9.2-p290.tar.gz
   # wget http://rubyforge.org/frs/download.php/74445/rubygems-1.6.2.tgz
 
@@ -84,7 +84,7 @@ Joruriユーザを作成します。
 Joruriソースコードを設置します。
 
   # mkdir /var/share
-  # tar xvzf jorurimail-1.0.1.tar.gz -C /var/share
+  # tar xvzf jorurimail-1.1.0.tar.gz -C /var/share
   # chown -R joruri:joruri /var/share/jorurimail
 
 **********************************************************************
@@ -167,7 +167,7 @@ RubyGemsをインストールします。
 
 Ruby on Rails をインストールします。
 
-  # gem install rails --include-dependencies -v 3.0.0
+  # gem install rails -v 3.0.0
   
 必要ライブラリをインストールします。
 
@@ -180,7 +180,7 @@ Ruby on Rails をインストールします。
 
 Phusion Passengerをインストールします。
 
-  # gem install passenger -v 3.0.8
+  # gem install passenger -v 3.0.9
   # passenger-install-apache2-module
   
   ( 画面の内容を確認して Enterキーを押してください。 )

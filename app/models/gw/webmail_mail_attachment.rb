@@ -10,7 +10,7 @@ class Gw::WebmailMailAttachment < ActiveRecord::Base
   set_table_name 'sys_files'
   
   def maxsize
-    Application.config(:attachment_file_max_size, 5)  * (1024**2)
+    Joruri.config.application['webmail.attachment_file_max_size'] * (1024**2)
   end
   
   def upload_path
@@ -40,7 +40,7 @@ class Gw::WebmailMailAttachment < ActiveRecord::Base
     end
     
     @filedata      = file.read
-    if image_size  = validate_image(@filedata)
+    if self.name =~ /\.(gif|jpg|jpeg|png)$/i && image_size = validate_image(@filedata)
       self.image_is     = 1
       self.image_width  = image_size[0]
       self.image_height = image_size[1]
@@ -55,7 +55,7 @@ class Gw::WebmailMailAttachment < ActiveRecord::Base
     end
     return true
   rescue => e
-    errors.add_to_base e.to_s
+    errors.add :base, e.to_s
     return false
   end
   

@@ -65,9 +65,15 @@ def create(auth_no, name, account, password, email)
     :email => email
 end
 
-u2 = create 2, '徳島　太郎'    , 'user1', 'user1', 'user1@demo.joruri.org'
-u3 = create 2, '徳島　花子'    , 'user2', 'user2', 'user2@demo.joruri.org'
-u4 = create 2, '吉野　三郎'    , 'user3', 'user3', 'user3@demo.joruri.org'
+u2 = create 2, '徳島　太郎'  , 'user1', 'user1', 'user1@demo.joruri.org' # 秘書広報課
+u3 = create 2, '徳島　花子'  , 'user2', 'user2', 'user2@demo.joruri.org' # 秘書広報課
+u4 = create 2, '吉野　三郎'  , 'user3', 'user3', 'user3@demo.joruri.org' # 秘書広報課
+u4 = create 2, '佐藤　直一'  , 'user4', 'user4', 'user4@demo.joruri.org' # 人事課
+u4 = create 2, '鈴木　裕介'  , 'user5', 'user5', 'user5@demo.joruri.org' # 人事課
+u4 = create 2, '高橋　和寿'  , 'user6', 'user6', 'user6@demo.joruri.org' # 人事課
+u4 = create 2, '田中　彩子'  , 'user7', 'user7', 'user7@demo.joruri.org' # 企画政策課
+u4 = create 2, '渡辺　真由子', 'user8', 'user8', 'user8@demo.joruri.org' # 企画政策課
+u4 = create 2, '伊藤　勝'    , 'user9', 'user9', 'user9@demo.joruri.org' # 企画政策課
 
 ## ---------------------------------------------------------
 ## sys/users_groups
@@ -77,6 +83,14 @@ Sys::UsersGroup.update_all({:group_id => g.id}, {:user_id => 1})
 Sys::UsersGroup.create :user_id => 2, :group_id => g.id
 Sys::UsersGroup.create :user_id => 3, :group_id => g.id
 Sys::UsersGroup.create :user_id => 4, :group_id => g.id
+g = Sys::Group.find_by_name_en('jinjika')
+Sys::UsersGroup.create :user_id => 5 , :group_id => g.id
+Sys::UsersGroup.create :user_id => 6 , :group_id => g.id
+Sys::UsersGroup.create :user_id => 7 , :group_id => g.id
+g = Sys::Group.find_by_name_en('kikakuseisakuka')
+Sys::UsersGroup.create :user_id => 8 , :group_id => g.id
+Sys::UsersGroup.create :user_id => 9 , :group_id => g.id
+Sys::UsersGroup.create :user_id => 10, :group_id => g.id
 
 ## ---------------------------------------------------------
 ## current_user

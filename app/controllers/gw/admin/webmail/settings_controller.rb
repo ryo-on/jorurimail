@@ -31,7 +31,7 @@ class Gw::Admin::Webmail::SettingsController < Gw::Controller::Admin::Base
     @item.value = params[:item][:value]
     
     _update(@item) do
-      if Application.config(:synchronize_mobile_setting) == 1
+      if Joruri.config.application['webmail.synchronize_mobile_setting'] == 1
         synchronize_mobile_setting(@item)
       end
     end

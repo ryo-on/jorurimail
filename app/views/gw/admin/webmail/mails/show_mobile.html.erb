@@ -11,6 +11,8 @@
   <% if @item.has_attachments? %>
   <img src="/_common/themes/admin/gw/webmail/mobile/images/clip-lightblue.jpg" alt="[有]">
   <% end %>
+  <% star_image = @item.starred? ? "/_common/themes/admin/gw/images/mailoption/star_on.gif" : "/_common/themes/admin/gw/images/mailoption/star_off.gif" %>
+  <%= link_to image_tag(star_image), star_gw_webmail_mails_path(@s_params.merge(:mailbox => @mailbox.name, :id => @item.uid, :from => :show)) %>
 </div>
 <div class="showItem">
   <font class="field">送信者</font>
@@ -59,8 +61,15 @@
     </div>
   <% end %>
   </div>
-  <% if @item.request_mdn? %>
-    <div class="recipientConfirm">[開封確認メッセージを送信]</div>
+  <%
+    if @mailbox.draft_box?(:all) || @mailbox.sent_box?(:all)
+      sent_mdn = @item.has_disposition_notification_to?
+    else
+      sent_mdn = @item.has_disposition_notification_to?# && @item.notified?
+    end
+  %>
+  <% if sent_mdn %>
+    <div id="mdnSent" class="recipientConfirm">[開封確認メッセージを送信]</div>
   <% end %>
 </div>
 
@@ -82,6 +91,7 @@
 <div class="title">開封確認</div>
 <div class="message">メール送信者は開封確認を要求しています。開封確認のメールを送信しますか？</div>
 <%= form_for :item, :url => send_mdn_gw_webmail_mail_path(@mailbox.name, @item.uid), :html => {:id => "mail", :name => "mdnForm", :class => "mdnForm"} do |f| %>
+  <%= hidden_field_tag :mobile, 1 %>
   <%= hidden_field_tag :send_mode, 'manual' %>
   <%= submit_tag '送信', :name => 'send', :class => 'menuItem' %>
 <% end %>
@@ -118,12 +128,12 @@
 </div>
 
 <div class="pagination">
-  <% if @pagination[:prev_uid] %><%= link_to "<<*前へ", gw_webmail_mail_path(@mailbox.name, @pagination[:prev_uid]), :accesskey => '*' %>
+  <% if @pagination[:prev_uid] %><%= link_to "<<*前へ", gw_webmail_mail_path(@s_params.merge(:mailbox => @mailbox.name, :id => @pagination[:prev_uid])), :accesskey => '*' %>
   <% else %>&lt;&lt;*前へ<% end %>
   <span class="separator"> | </span> 
-  <% if @pagination[:next_uid] %><%= link_to "次へ#>>", gw_webmail_mail_path(@mailbox.name, @pagination[:next_uid]), :accesskey => '#' %>
+  <% if @pagination[:next_uid] %><%= link_to "次へ#>>", gw_webmail_mail_path(@s_params.merge(:mailbox => @mailbox.name, :id => @pagination[:next_uid])), :accesskey => '#' %>
   <% else %>次へ#&gt;&gt;<% end %>
   <br />
 </div>
 
-<div class="link"><%= link_to '一覧へ戻る', url_for(:action => :index, :mailbox => @mailbox.name, :mobile => :list), :class => 'link' %></div>
+<div class="link"><%= link_to '一覧へ戻る', url_for(@s_params.merge(:action => :index, :mailbox => @mailbox.name, :mobile => :list)), :class => 'link' %></div>

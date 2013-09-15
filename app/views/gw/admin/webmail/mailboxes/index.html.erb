@@ -2,7 +2,7 @@
 
 path_options = []
 @mailboxes.each do |box|
-  next if box.name =~ /^(Drafts|Trash)(\.|$)/
+  next if box.name =~ /^(Drafts|Trash|Star)(\.|$)/
   next if box.name == @mailbox.name
   next if box.name.index("#{@mailbox.name}.") == 0
   path_options << [box.slashed_title, "#{box.name}."]
@@ -24,7 +24,7 @@ end
 
 <p class="form"><%= @mailbox.title %></p>
 
-<% if @mailbox.name == 'Trash' || @mailbox.name =~ /^Drafts(\.|$)/ %>
+<% if @mailbox.name == 'Trash' || @mailbox.name == 'Star' || @mailbox.name =~ /^Drafts(\.|$)/ %>
   <div style="margin-top: 10px;"><%= @mailbox.title %>は変更できません。</div>
 <% elsif @mailbox.name !~ /^Trash\./ %>
   <%= form_for :item, :url => {:action => :create} do |f| %>
@@ -37,7 +37,7 @@ end
   <% end %>
 <% end %>
   
-<% if @mailbox.name !~ /^(INBOX|Drafts|Sent|Archives|Trash)$/ %>
+<% if @mailbox.name !~ /^(INBOX|Drafts|Sent|Archives|Trash|Star)$/ %>
 
   <br />
   <%= form_for :item, :url => {:action => :update}, :html => {:method => :put} do |f| %>

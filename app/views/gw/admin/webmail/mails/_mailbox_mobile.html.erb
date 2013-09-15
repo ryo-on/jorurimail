@@ -6,7 +6,7 @@ plv  = 0
   clv       = box.parents_count
   idt       = "  " * clv
   li_class  = []
-  li_class << (box.name =~ /^(INBOX|Drafts|Sent|Archives|Trash)$/ ? box.name.downcase : "folder")
+  li_class << (box.name =~ /^(INBOX|Drafts|Sent|Archives|Trash|Star)$/ ? box.name.downcase : "folder")
   li_class  = %Q(class="#{li_class.join(' ')}")
   nm_class  = ["name"]
   nm_class << "current" if box.name == @mailbox.name

@@ -47,7 +47,7 @@ class Sys::Group < ActiveRecord::Base
   end
   
   def self.show_only_ldap_user
-    Application.config(:show_only_ldap_user) == 1
+    Joruri.config.application['webmail.show_only_ldap_user'] == 1
   end
   
   def users_having_email(order = "id")

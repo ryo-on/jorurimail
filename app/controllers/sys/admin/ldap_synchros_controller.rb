@@ -131,17 +131,20 @@ protected
     ## users
     if group.users.size > 0
       group.users.each do |user|
-        su                = Sys::User.find_by_account(user.code) || Sys::User.new
-        su.account        = user.code
-        su.state        ||= 'enabled'
-        su.auth_no      ||= 2
-        su.name           = user.name
-        su.name_en        = user.name_en
-        su.email          = user.email
-        su.kana           = user.kana
-        su.ldap         ||= 1
-        su.ldap_version   = @version
-        su.in_group_id    = sg.id
+        su                   = Sys::User.find_by_account(user.code) || Sys::User.new
+        su.account           = user.code
+        su.state           ||= 'enabled'
+        su.auth_no         ||= 2
+        su.name              = user.name
+        su.name_en           = user.name_en
+        su.email             = user.email
+        su.kana              = user.kana
+        su.sort_no           = user.sort_no
+        su.official_position = user.official_position
+        su.assigned_job      = user.assigned_job
+        su.ldap            ||= 1
+        su.ldap_version      = @version
+        su.in_group_id       = sg.id
         
         if su.ldap == 1
           if su.save
@@ -184,14 +187,17 @@ protected
     
     entry.users.each do |e|
       user = Sys::LdapSynchro.new({
-        :parent_id  => group.id,
-        :version    => @version,
-        :entry_type => 'user',
-        :code       => e.uid,
-        :name       => e.name,
-        :name_en    => e.name_en,
-        :email      => e.email,
-        :kana       => e.kana
+        :parent_id         => group.id,
+        :version           => @version,
+        :entry_type        => 'user',
+        :code              => e.uid,
+        :name              => e.name,
+        :name_en           => e.name_en,
+        :email             => e.email,
+        :kana              => e.kana,
+        :sort_no           => e.sort_no,
+        :official_position => e.official_position,
+        :assigned_job      => e.assigned_job
       })
       user.save ? @results[:user] += 1 : @results[:error] += 1
     end
