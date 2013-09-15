@@ -549,6 +549,7 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
     t.string   "tel"
     t.string   "outline_uri"
     t.text     "email"
+    t.string   "group_s_name"
   end
 
   create_table "sys_languages", :force => true do |t|
@@ -574,6 +575,7 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
     t.string   "sort_no"
     t.string   "official_position"
     t.string   "assigned_job"
+    t.string   "group_s_name"
   end
 
   add_index "sys_ldap_synchros", ["version", "parent_id", "entry_type"], :name => "version"
@@ -689,6 +691,7 @@ ActiveRecord::Schema.define(:version => 20101025002218) do
     t.string   "sort_no"
     t.string   "official_position"
     t.string   "assigned_job"
+    t.string   "group_s_name"
   end
 
   create_table "sys_users_groups", :id => false, :force => true do |t|

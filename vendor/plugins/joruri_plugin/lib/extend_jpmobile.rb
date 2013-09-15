@@ -139,7 +139,8 @@ module Jpmobile::Mobile
   end
 end
 
-if Joruri.config.application['sys.force_mobile_site'] == 1
+case Joruri.config.application['sys.force_site']
+when 'mobile'
   module Jpmobile::Mobile
     class Others < SmartPhone
       USER_AGENT_REGEXP = /./
@@ -148,5 +149,9 @@ if Joruri.config.application['sys.force_mobile_site'] == 1
   
   module Jpmobile::Mobile
     @carriers << 'Others'
+  end
+when 'pc'
+  module Jpmobile::Mobile
+    @carriers = []
   end
 end

@@ -238,6 +238,10 @@ a#fontExtraLarge {
   width: 88px;
   background-image: url(../images/bt/bt_l_newgloup.gif);
 }
+#webmailMenu .accounts select.account {
+  width: 180px;
+  margin-bottom: 10px;
+}
 #webmailContent {
   padding: 10px 0px 20px 0px;
   vertical-align: top;
@@ -522,6 +526,7 @@ form.search td input.email {
 #webmailContent .menu a.seen,
 #webmailContent .menu a.unseen,
 #webmailContent .menu a.spam,
+#webmailContent .menu a.label,
 #webmailContent .menu a.search {
   display: inline-block;
   overflow: hidden;
@@ -580,6 +585,10 @@ form.search td input.email {
 #webmailContent .menu a.forward {
   width: 52px;
   background-image: url(../images/bt/bt_m_forward.gif);
+}
+#webmailContent .menu a.label {
+  width: 61px;
+  background-image: url(../images/bt/bt_m_label.gif);
 }
 #webmailContent .menu a.etc {
   width: 61px;
@@ -713,6 +722,12 @@ form.search td input.email {
 #mailContent table.mail td.subject {
   font-weight: bold;
 }
+#mailContent table.mail td.subject span.subject {
+  margin-right: 5px;
+}
+#mailContent table.mail td.subject span.attachmentMark {
+  margin-right: 5px;
+}
 #mailContent table.mail td.subject a.attachmentMark {
   display: inline-block;
   height: 0;
@@ -748,7 +763,25 @@ form.search td input.email {
   background-position: center center;
   width: 16px;
   height: 16px;
+}
+#mailContent table.mail td.subject .star-loading {
   float: right;
+}
+#mailContent table.mail td.subject .labels {
+  float: right;
+  margin-right: 5px;
+}
+#mailContent table.mail td.subject .labels .label {
+  margin: 0 1px;
+  padding: 0 1px;
+  color: #fff;
+  height: 1.65em;
+  font-weight: lighter;
+  font-size: 0.8em;
+}
+#mailContent table.mail td.subject .label-loading {
+  float: right;
+  margin-right: 5px;
 }
 
 #mailContent table.mail td.thumbnailArea span.thumbnail {
@@ -808,6 +841,16 @@ form.search td input.email {
   margin: 10px 0 0 0;
   font-weight: bold;
   text-align: right;
+}
+#mailContent .mailBody .scheduleMenu {
+  margin: 10px 0 0 0;
+  text-align: right;
+}
+#mailContent .mailBody .scheduleMenu a {
+  background-image: url("../images/ic-month.gif");
+  background-repeat: no-repeat;
+  background-position: left center;
+  padding-left: 15px;
 }
 #mailContent .mailViewSelector {
   text-align: right;

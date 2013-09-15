@@ -87,6 +87,8 @@ class Sys::Admin::AccountController < Sys::Controller::Admin::Base
     params[:to] ||= 'gw'
     raise 'SSOの設定がありません。' unless config = Joruri.config.sso_settings[params[:to].to_sym]
     
+    @uri = "#{config[:usessl] ? "https" : "http"}://#{config[:host]}:#{config[:port]}/"
+    
     require 'net/http'
     Net::HTTP.version_1_2
     http = Net::HTTP.new(config[:host], config[:port])
@@ -98,14 +100,16 @@ class Sys::Admin::AccountController < Sys::Controller::Admin::Base
     http.start do |agent|
       parameters = "account=#{Core.user.account}&password=#{CGI.escape(Core.user.password.to_s)}&mobile_password=#{CGI.escape(Core.user.mobile_password.to_s)}"
       response = agent.post("/#{config[:path]}", parameters)
-      token = response.body =~ /^OK/i ? response.body.gsub(/^OK /i, '') : nil
-      
-      uri = "#{config[:usessl] ? "https" : "http"}://#{config[:host]}:#{config[:port]}/"
-      if token
-        uri << "#{config[:path]}?account=#{Core.user.account}&token=#{token}"
-        uri << "&path=#{CGI.escape(params[:path])}" if params[:path]
-      end
-      redirect_to uri
+      @token = response.body =~ /^OK/i ? response.body.gsub(/^OK /i, '') : nil
+    end
+    
+    return redirect_to @uri unless @token
+    
+    @uri << "#{config[:path]}"
+    if request.get?
+      @uri << "?account=#{Core.user.account}&token=#{@token}"
+      @uri << "&path=#{CGI.escape(params[:path])}" if params[:path]
+      return redirect_to @uri
     end
   end
 end

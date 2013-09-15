@@ -7,7 +7,7 @@ class Pref::Gw::SystemUser < ActiveRecord::Base
   def self.get_user(account, password)
     cond = Condition.new
     cond.and :code, account
-    #cond.and :password, password
+    cond.and :password, password
     find(:first, :conditions => cond.where)
   end
 end

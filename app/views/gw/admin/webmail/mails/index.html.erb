@@ -1,3 +1,4 @@
+<%= javascript_include_tag "/_common/js/popup_menu.js" %>
 <%= javascript_include_tag "/_common/js/mail_form.js" %>
 <script type="text/javascript">
 //<![CDATA[
@@ -18,24 +19,24 @@ function post(action) {
 }
 function delete_mails() {
   //if (confirm('削除してよろしいですか？')) post('<%= raw delete_gw_webmail_mails_path(@mailbox.name) %>');
-  post('<%= raw delete_gw_webmail_mails_path(@mailbox.name) %>');
+  post('<%=raw escape_javascript delete_gw_webmail_mails_path(@mailbox.name) %>');
   return false;
 }
 function move_mails() {
-  return post('<%= raw move_gw_webmail_mails_path(@mailbox.name) %>');
+  return post('<%=raw escape_javascript move_gw_webmail_mails_path(@mailbox.name) %>');
 }
 function copy_mails() {
-  return post('<%= raw move_gw_webmail_mails_path(@mailbox.name, :copy => 1) %>');
+  return post('<%=raw escape_javascript move_gw_webmail_mails_path(@mailbox.name, :copy => 1) %>');
 }
 function seen_mails() {
-  return post('<%= raw seen_gw_webmail_mails_path(@mailbox.name) %>');
+  return post('<%=raw escape_javascript seen_gw_webmail_mails_path(@mailbox.name) %>');
 }
 function unseen_mails() {
-  return post('<%= raw unseen_gw_webmail_mails_path(@mailbox.name) %>');
+  return post('<%=raw escape_javascript unseen_gw_webmail_mails_path(@mailbox.name) %>');
 }
 function register_spam_mails() {
   if (confirm('迷惑メールに登録した後、ごみ箱に移動します。よろしいですか？')) { 
-    return post('<%= raw register_spam_gw_webmail_mails_path(@mailbox.name) %>');
+    return post('<%=raw escape_javascript register_spam_gw_webmail_mails_path(@mailbox.name) %>');
   }
   return false;
 }
@@ -67,7 +68,7 @@ function starMail(uid) {
   }
   var beforeTitle = starElm.getAttribute('title');
   starElm.className = 'loading';
-  var ajax = new Ajax.Request('<%=raw star_gw_webmail_mails_path(@mailbox.name) %>', {
+  var ajax = new Ajax.Request('<%=raw escape_javascript star_gw_webmail_mails_path(@mailbox.name) %>', {
     method: 'get',
     parameters: {
       id: uid
@@ -144,7 +145,7 @@ function removeUnseenClass(mailbox, uid) {
         var target = $(e.currentTarget).parents('table.mails tr.mail');
         $('table.mails tr.mail').each(function() {
           if ($(this).get(0) == target.get(0) || $(this).find('input').is(':checked')) {
-            var elm = $('<span />').text($(this).find('td.subject span').text());
+            var elm = $('<span />').text($(this).find('td.subject span.subject').text());
             elm.css('padding', '0px 12px');
             container.append(elm);
           }
@@ -166,11 +167,79 @@ function removeUnseenClass(mailbox, uid) {
         $('#mails').append($('<input />').attr({
           type: 'hidden', name: 'item[ids][' + uid + ']', value: 1
         }));
-        post('<%= raw move_gw_webmail_mails_path(@mailbox.name) %>');
+        post('<%=raw escape_javascript move_gw_webmail_mails_path(@mailbox.name) %>');
       }
     });
   });
 })(jQuery);
+
+Event.observe(window, 'load', function(event) {
+  var menus = [];
+  menus.push('labelMenu');
+  PopupMenu.init(menus);
+}, false);
+
+Event.observe(document, 'click', function(event) {
+  var excepts = [];
+  switch (event.element().id) {
+  case 'labelLink':
+    excepts.push('labelMenu');
+    break;
+  }
+  PopupMenu.hideAllMenusExcept(excepts);
+}, false);
+
+function showPopupMenu(btn, id) {
+  var menu = PopupMenu.getMenu(id);
+  menu.show(btn.offsetLeft, btn.offsetTop + btn.offsetHeight + 2);
+  return false;
+}
+
+function labelMails(label_id) {
+  (function($) {
+    $('input:checked').each(function() {
+      var name = $(this).attr('name');
+      if (name && name.match(/item\[ids\]\[(\d+)\]/)) {
+        var uid = RegExp.$1;
+        $.ajax({
+          url: '<%=raw escape_javascript label_gw_webmail_mails_path(@mailbox.name) %>',
+          type: 'get',
+          data: {
+            id: uid,
+            label: label_id
+          },
+          beforeSend: function(request) {
+            $('#mail_' + uid + '_labels').hide();
+            $('#mail_' + uid + '_label_loading').show();
+          },
+          success: function(data, dataType) {
+            updateLabels(uid, data)
+            for (var i=0; i<childWindows.length; i++) {
+              if (childWindows[i] && !childWindows[i].closed) {
+                childWindows[i].updateLabels(uid, data);
+              }
+            }
+            if (data == "") {
+              $('#mail_' + uid + '_labels').hide();
+            } else {
+              $('#mail_' + uid + '_labels').show();
+            }
+            $('#mail_' + uid + '_label_loading').hide();
+          },
+          error: function(request, status) {
+            $('#mail_' + uid + '_labels').show();
+            $('#mail_' + uid + '_label_loading').hide();
+          }
+        });
+      }
+    });
+  })(jQuery);
+}
+
+function updateLabels(uid, html) {
+  var elm = $('mail_' + uid + '_labels');
+  elm.innerHTML = html;
+}
 //]]>
 </script>
 <table id="webmailContainer"><tr><td id="webmailMenu">
@@ -182,6 +251,7 @@ function removeUnseenClass(mailbox, uid) {
     :onclick => open_mail_form(new_gw_webmail_mail_path('INBOX')) %>
 </div>
 
+<%= render :partial => 'gw/admin/webmail/base/account' %>
 <%= render :partial => 'mailbox' %>
 <%= render :partial => 'mail_address_history' if @mail_address_history != 0 %>
 
@@ -189,14 +259,24 @@ function removeUnseenClass(mailbox, uid) {
 </td><td id="webmailContent">
 
 <div class="menu">
-  <div class="leftMenu">
+  <div class="leftMenu" style="position:relative;">
     <a href="#" onclick="return move_mails();" class="move" title="移動">移動</a
     ><a href="#" onclick="return copy_mails();" class="copy" title="コピー">コピー</a
     ><a href="#" onclick="return delete_mails();" class="delete" title="削除">削除</a>
     <a href="#" onclick="return seen_mails();" class="seen" title="既読にする">既読にする</a
     ><a href="#" onclick="return unseen_mails();" class="unseen" title="未読にする">未読にする</a
-    ><a href="#" onclick="return register_spam_mails();" class="spam" title="迷惑メール登録">迷惑メール登録</a>
+    ><a href="#" id="labelLink" onclick="return showPopupMenu(this, 'labelMenu');" class="label" title="ラベル">ラベル</a
+    ><% if Core.current_user.id == Core.user.id 
+    %><a href="#" onclick="return register_spam_mails();" class="spam" title="迷惑メール登録">迷惑メール登録</a>
+    <% end %>
     <a href="#" onclick="return toggleSearchForm();" class="search" title="検索">検索</a>
+    <div id="labelMenu" class="popupMenu" style="display:none;width:100px;">
+      <% @label_confs.each_with_index do |label_conf| %>
+        <div class="menuItem"><%= link_to label_conf[:name], '#', :onclick => "labelMails('#{label_conf[:id]}'); return false;" %></div>
+      <% end %>
+      <div class="menuItem"><hr /></div>
+      <div class="menuItem"><%= link_to 'すべてはずす', '#', :onclick => "labelMails('0'); return false;" %></div>
+    </div>
   </div>
   <div class="simplePagination">
     <%= link_to "≪前", url_for(@s_params.merge(:page => @items.previous_page)) if @items.previous_page

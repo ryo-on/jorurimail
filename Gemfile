@@ -1,9 +1,9 @@
 source 'http://rubygems.org'
 
-gem 'rake', '0.8.7'
-gem 'rails', '3.0.0'
-gem 'ruby-mysql', "2.9.4"
-gem 'ruby-ldap', "0.9.11"
+gem "rake", "0.8.7"
+gem "rails", "3.0.0"
+gem "ruby-mysql", "2.9.4"
+gem "ruby-ldap", "0.9.11"
 gem "will_paginate", "3.0.pre2"
 gem "jpmobile", "1.0.0.pre"
 gem "net-ssh", "2.0.23"

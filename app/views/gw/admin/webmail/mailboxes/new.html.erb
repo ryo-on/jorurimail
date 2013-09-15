@@ -5,6 +5,7 @@
   <%= link_to "フォルダの登録", url_for(:action => :new, :mailbox => "INBOX"), :class => 'newMailbox', :title => "フォルダの登録" %>
 </div>
 
+<%= render :partial => 'gw/admin/webmail/base/account' %>
 <%= render :partial => "mailbox" %>
 
 </div>

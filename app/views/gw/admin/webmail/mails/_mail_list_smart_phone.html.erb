@@ -79,7 +79,14 @@ function starMail(uid) {
           <span class="date"><%= "#{item.date}" %></span>
           <span class="from"><%= mail_text_wrap(from) %></span><br />
           <span class="subject overflowHidden <%= subject_wrap %>" title="<%= item.subject %>">
-            <%= mail_text_wrap(value) %>
+            <span id="mail_<%= item.uid %>_labels" class="labels">
+              <% 
+                item.labels.each do |label|
+                  if label_conf = @label_confs.find{|conf| conf[:id] == label}
+                    concat raw %Q(<span class="label" style="background-color:#{label_conf[:color]};">#{label_conf[:name]}</span>)
+                  end
+                end
+              %></span><span class="text"><%= mail_text_wrap(value) %></span>
           </span>
           <% if @mailbox.name =~ /^(Star)$/ %>
           <span class="mailbox"> 

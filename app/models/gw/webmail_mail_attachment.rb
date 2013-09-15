@@ -1,6 +1,4 @@
 # encoding: utf-8
-#require 'filemagic/ext'
-require 'mime/types'
 require 'shared-mime-info'
 class Gw::WebmailMailAttachment < ActiveRecord::Base
   include Sys::Model::Base
@@ -34,7 +32,7 @@ class Gw::WebmailMailAttachment < ActiveRecord::Base
     self.title   ||= name
     raise "ファイル名を入力してください。" if name.blank?
     
-    self.mime_type = MIME::Types.type_for(self.name)[0].to_s
+    self.mime_type = MIME.check_globs(self.name).type rescue nil
     if self.mime_type.blank?
       self.mime_type = MIME.check_magics(file.path).type rescue "application/octet-stream"
     end

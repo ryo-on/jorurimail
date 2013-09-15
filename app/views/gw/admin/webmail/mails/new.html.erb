@@ -116,5 +116,12 @@ function checkServerStatus(button) {
 
 <% end %>
 
+<%= form_tag '/_admin/sso', :method => :post, :name => 'scheduleForm', :target => "scheduleWindow_#{Core.now.gsub(/[\W]/, '')}", :style => 'display:none;' do %>
+  <%= hidden_field_tag :to, 'gw' %>
+  <%= hidden_field_tag :path, '/gw/schedules/new', :id => 'schedule_path' %>
+  <%= hidden_field_tag 'item[title]', '', :id => 'schedule_title'  %>
+  <%= hidden_field_tag 'item[memo]', '', :id => 'schedule_memo'  %>
+<% end %>
+
 </div><!-- end #webmailContainer --></td></table>
 <!-- end #mailFormContainer --></div>

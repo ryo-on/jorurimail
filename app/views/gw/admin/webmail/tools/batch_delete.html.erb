@@ -1,14 +1,21 @@
 <%= content_for :header do %>
-  <%= calendar_date_select_includes 'default', :locale => 'ja' %>
+<%= javascript_include_tag '/_common/js/jquery/jquery.ui.datepicker-ja.js' %>
+<%= stylesheet_link_tag '/_common/js/jquery/jquery.ui.datepicker.css' %>
 <% end %>
 
 <script type="text/javascript">
 //<![CDATA[
-  var confirm_before_submit = function(form) {
-    if (confirm('ごみ箱に移動せず、直接削除します。\n（元に戻すことはできません）')) {
-      $('batchDeleteForm').submit();
-    }
+(function($) {
+  $(function() {
+    $('input.datepicker').datepicker();
+  });
+})(jQuery);
+
+var confirm_before_submit = function(form) {
+  if (confirm('ごみ箱に移動せず、直接削除します。\n（元に戻すことはできません）')) {
+    $('batchDeleteForm').submit();
   }
+}
 //]]>
 </script>
 
@@ -21,30 +28,37 @@
 </td><td id="webmailContent"><div id="toolContent">
 
 <p class="form">一括削除</p>
-<%= form_tag '', :id => 'batchDeleteForm' do %>
+<%= error_messages_for :item %>
+<%= form_for :item, :id => 'batchDeleteForm' do |f| %>
 <table class="show">
+  <tr>
+    <th>アカウント</th>
+    <td>
+      <%= "#{Core.current_user.name}（#{Core.current_user.account}）" %>
+    </td>
+  </tr>
   <tr>
     <th>対象フォルダ</th>
     <td>
-      <%= select_tag :mailbox_id, options_for_select([["全てのフォルダ", 0]] + mailbox_selection(@mailboxes, :except => ['Star']), 0) %>
+      <%= f.select :mailbox_id, options_for_select([["全てのフォルダ", 0]] + mailbox_selection(@mailboxes, :except => ['Star']), @item.mailbox_id.to_i) %>
     </td>
   </tr>
   <tr>
     <th>削除開始日</th>
     <td>
-      <%= calendar_date_select_tag :start_date, Time.now, :popup => "force" %>
+      <%= f.text_field :start_date, :class => 'datepicker' %>
     </td>
   </tr>
   <tr>
     <th>削除終了日</th>
     <td>
-      <%= calendar_date_select_tag :end_date, Time.now, :popup => "force" %>
+      <%= f.text_field :end_date, :class => 'datepicker' %>
     </td>
   </tr>
   <tr>
     <th>スター付きメール</th>
     <td>
-      <%= check_box_tag :include_starred, 1, false %><%= label_tag :include_starred, 'スター付きメールを削除する' %>
+      <%= f.check_box :include_starred %><%= f.label :include_starred, 'スター付きメールを削除する' %>
     </td>
   </tr>
 </table>

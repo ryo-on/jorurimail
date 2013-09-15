@@ -116,10 +116,10 @@ class Gw::WebmailFilter < ActiveRecord::Base
   end
 
   def self.apply_recents
-    cond = {:user_id => Core.user.id, :state => 'enabled'}
+    cond = {:user_id => Core.current_user.id, :state => 'enabled'}
     filters = Gw::WebmailFilter.find(:all, :conditions => cond, :order => "sort_no, id")
     
-    cond = {:user_id => Core.user.id, :name => 'last_uid'}
+    cond = {:user_id => Core.current_user.id, :name => 'last_uid'}
     st   = Gw::WebmailSetting.find(:first, :conditions => cond) || Gw::WebmailSetting.new(cond)
     
     next_uid = Core.imap.status('INBOX', ["UIDNEXT"])["UIDNEXT"]
@@ -245,7 +245,7 @@ class Gw::WebmailFilter < ActiveRecord::Base
   
   def self.register_spams(items)
     cond = {
-      :user_id   => Core.user.id,
+      :user_id   => Core.current_user.id,
       :name      => '* 迷惑メール',
     }
     unless filter = self.find(:first, :conditions => cond)
@@ -263,7 +263,7 @@ class Gw::WebmailFilter < ActiveRecord::Base
     
     items.each_with_index do |item, i|
       cond = {
-        :user_id   => Core.user.id,
+        :user_id   => Core.current_user.id,
         :filter_id => filter.id,
         :column    => 'from',
         :inclusion => '<',
@@ -278,7 +278,7 @@ class Gw::WebmailFilter < ActiveRecord::Base
     
     spam_max_count = Joruri.config.application['webmail.filter_condition_max_count'] 
     
-    cond = {:user_id => Core.user.id, :filter_id => filter.id}
+    cond = {:user_id => Core.current_user.id, :filter_id => filter.id}
     spam_count = Gw::WebmailFilterCondition.count(:all, :conditions => cond)
     if spam_count > spam_max_count
       del_items = Gw::WebmailFilterCondition.find(:all, :conditions => cond, :limit => spam_count - spam_max_count, :order => 'sort_no')

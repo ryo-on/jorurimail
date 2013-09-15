@@ -23,7 +23,11 @@
 #  
 #  def load_globs
 #    open(file) => open(file, 'rb')
-
+#
+# = Updated by IDS Inc. on 2012-05-18.
+#
+#  Enumerable::Enumerator => Enumerator
+#
 require 'enumerator'
 require 'rexml/document'
 
@@ -252,7 +256,7 @@ module MIME
     #
     # Returns a MIME::Type object or _nil_ if nothing matches.
     def check_globs(filename)
-      enum = Enumerable::Enumerator.new(@globs, :each_key)
+      enum = Enumerator.new(@globs, :each_key)
       found = enum.select { |pattern| File.fnmatch pattern, filename }
 
       if found.empty?

@@ -1,3 +1,8 @@
+1.2.0
+  ALTER TABLE `sys_users` ADD `group_s_name` VARCHAR( 255 ) NULL;
+  ALTER TABLE `sys_groups` ADD `group_s_name` VARCHAR( 255 ) NULL;
+  ALTER TABLE `sys_ldap_synchros` ADD `group_s_name` VARCHAR( 255 ) NULL;
+
 1.1.0
   CREATE TABLE IF NOT EXISTS `gw_webmail_docs` (
     `id` int(11) NOT NULL AUTO_INCREMENT,

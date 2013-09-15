@@ -10,7 +10,7 @@ Joruri::Application.routes.draw do
           :controller => "webmail/mails",
           :path => "webmail/*mailbox/mails" do
             collection do
-              get :empty, :close, :reset_address_history, :star
+              get :empty, :close, :reset_address_history, :star, :label
               post :move, :delete, :seen, :unseen, :register_spam, :mobile_manage, :status
             end
             member do
@@ -18,6 +18,8 @@ Joruri::Application.routes.draw do
               post :edit, :answer, :forward, :send_mdn, :mobile_send
             end
           end
+        match "webmail/*mailbox/mails/new" => 
+          "webmail/mails#new", :via => :post
         resources "webmail_mailboxes",
           :controller => "webmail/mailboxes",
           :path => "webmail/*mailbox/mailboxes"

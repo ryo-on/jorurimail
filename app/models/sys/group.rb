@@ -1,5 +1,5 @@
 # encoding: utf-8
-class Sys::Group < ActiveRecord::Base
+class Sys::Group < Sys::ManageDatabase
   include Sys::Model::Base
   include Sys::Model::Base::Config
   include Sys::Model::Tree

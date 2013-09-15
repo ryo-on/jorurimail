@@ -35,6 +35,11 @@ class Sys::Lib::Ldap::Group < Sys::Lib::Ldap::Entry
   def email
     group_user ? group_user.get(:mail) : nil
   end
+    
+  ## Attribute: group_s_name
+  def group_s_name
+    group_user ? group_user.get(:roomNumber) : nil
+  end
   
   ## Returns the parent group.
   def parent

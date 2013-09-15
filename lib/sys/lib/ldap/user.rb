@@ -47,4 +47,9 @@ class Sys::Lib::Ldap::User < Sys::Lib::Ldap::Entry
   def assigned_job
     get(:employeeType)
   end
+  
+  ## Attribute: group_s_name
+  def group_s_name
+    get(:roomNumber)
+  end
 end

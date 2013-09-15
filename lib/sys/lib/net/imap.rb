@@ -15,8 +15,8 @@ module Sys::Lib::Net::Imap
     
     imap = nil
     begin
-      username = Core.user.account
-      password = Core.user.password
+      username = Core.current_user.account
+      password = Core.current_user.password
       timeout(3) do
         imap = Net::IMAP.new(config[:address], config[:port], config[:usessl])
         imap.login(username, password)
@@ -25,6 +25,7 @@ module Sys::Lib::Net::Imap
     rescue Net::IMAP::ByeResponseError => e
       raise "IMAP: 接続に失敗 (ByeResponseError)"
     rescue Net::IMAP::NoResponseError => e
+      raise "IMAP: 認証に失敗しました。アカウントとパスワードの設定を確認してください。" if e.message == 'Authentication failed.'
       raise "IMAP: 接続に失敗 (NoResponseError)"
     rescue OpenSSL::SSL::SSLError
       raise "IMAP: 接続に失敗 (SSLError)"
@@ -89,17 +90,14 @@ module Sys::Lib::Net::Imap
     flags.index('$Notified')
   end
   
-  def tagged?
-    flags.each do |v|
-      return true if v =~ /^\$label[0-9]/
-    end
-    false
+  def labeled?(label_id = "")
+    flags.index("$label#{label_id}")
   end
   
-  def tag
-    tagged = []
-    flags.each{|v| tagged << v.gsub(/^\$label([0-9]+)$/, '\1') if v =~ /^\$label[0-9]+$/}
-    tagged.sort
+  def labels
+    labeled = []
+    flags.each{|v| labeled << v.gsub(/^\$label([0-9]+)$/, '\1') if v =~ /^\$label[0-9]+$/}
+    labeled.sort
   end
   
   def destroy(complete = false)
@@ -266,7 +264,7 @@ module Sys::Lib::Net::Imap
       
       num = 0
       imap.select(from_mailbox) rescue return 0
-      Util::Database.lock_by_name(Core.user.account) do
+      Util::Database.lock_by_name(Core.current_user.account) do
         res = imap.uid_copy(uids, to_mailbox) rescue nil
         return 0 if !res || res.name != "OK"
         num = imap.uid_store(uids, "+FLAGS", [:Deleted]).size rescue 0
@@ -290,7 +288,7 @@ module Sys::Lib::Net::Imap
       
       num = 0
       imap.select(mailbox) rescue return 0
-      Util::Database.lock_by_name(Core.user.account) do
+      Util::Database.lock_by_name(Core.current_user.account) do
         if mailbox !~ /^Trash(\.|$)/ && mailbox !~ /^Star(\.|$)/ && !complete
           unless imap.list("", "Trash")
             res = imap.create("Trash")
@@ -329,6 +327,22 @@ module Sys::Lib::Net::Imap
       imap.select(mailbox) rescue return 0
       starred_uids = imap.uid_search(['UID', uids, 'UNDELETED', 'FLAGGED'], 'utf-8')
       uids.inject(false){|result,x| result || starred_uids.include?(x)}
+    end
+    
+    def label_all(mailbox, uids, label_id)
+      imap.select(mailbox) rescue return 0
+      imap.uid_store(uids, "+FLAGS", ["$label#{label_id}"]).size rescue 0
+    end
+    
+    def unlabel_all(mailbox, uids, label_id = nil)
+      labels = []
+      if label_id
+        labels << "$label#{label_id}"
+      else
+        (0..9).each{|label_id| labels << "$label#{label_id}"}
+      end
+      imap.select(mailbox) rescue return 0
+      imap.uid_store(uids, "-FLAGS", labels).size rescue 0
     end
   end
 end

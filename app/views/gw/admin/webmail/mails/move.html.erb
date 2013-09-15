@@ -22,6 +22,7 @@ action_label = params[:copy].blank? ? '移動' : 'コピー'
     :onclick => open_mail_form(new_gw_webmail_mail_path('INBOX')) %>
 </div>
 
+<%= render :partial => 'gw/admin/webmail/base/account' %>
 <%= render :partial => 'mailbox' %>
 <%= render :partial => 'mail_address_history' if @mail_address_history != 0 %>
 

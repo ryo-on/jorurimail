@@ -9,7 +9,7 @@ class Sys::Admin::AirController < ApplicationController
   end
   
   def login
-    @admin_uri = '/_admin/gw/webmail/INBOX/mails'
+    @admin_uri = params[:path] || '/_admin/gw/webmail/INBOX/mails'
     @admin_uri += '?mobile=top' if request.mobile?
     
     if params[:account] && params[:password]
@@ -58,7 +58,9 @@ class Sys::Admin::AirController < ApplicationController
     
     set_current_user(user)
     Sys::Session.delete_past_sessions_at_random
-      
-    redirect_to @admin_uri
+    
+    if request.get?
+      redirect_to @admin_uri
+    end
   end
 end

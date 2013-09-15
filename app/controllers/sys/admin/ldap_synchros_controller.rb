@@ -114,6 +114,7 @@ protected
     sg.name           = group.name
     sg.name_en        = group.name_en if !group.name_en.blank?
     sg.email          = group.email if !group.email.blank?
+    sg.group_s_name   = group.group_s_name
     sg.level_no       = parent.level_no + 1
     #sg.sort_no        = group.sort_no
     sg.ldap         ||= 1
@@ -142,6 +143,7 @@ protected
         su.sort_no           = user.sort_no
         su.official_position = user.official_position
         su.assigned_job      = user.assigned_job
+        su.group_s_name      = user.group_s_name
         su.ldap            ||= 1
         su.ldap_version      = @version
         su.in_group_id       = sg.id
@@ -171,13 +173,14 @@ protected
     end
     
     group = Sys::LdapSynchro.new({
-      :parent_id  => group_id,
-      :version    => @version,
-      :entry_type => 'group',
-      :code       => entry.code,
-      :name       => entry.name,
-      :name_en    => entry.name_en,
-      :email      => entry.email,
+      :parent_id    => group_id,
+      :version      => @version,
+      :entry_type   => 'group',
+      :code         => entry.code,
+      :name         => entry.name,
+      :name_en      => entry.name_en,
+      :email        => entry.email,
+      :group_s_name => entry.group_s_name,
     })
     unless group.save
       @results[:error] += 1
@@ -197,7 +200,8 @@ protected
         :kana              => e.kana,
         :sort_no           => e.sort_no,
         :official_position => e.official_position,
-        :assigned_job      => e.assigned_job
+        :assigned_job      => e.assigned_job,
+        :group_s_name      => e.group_s_name
       })
       user.save ? @results[:user] += 1 : @results[:error] += 1
     end

@@ -141,6 +141,26 @@
   text-align: right;
   cursor: pointer;
 }
+#webmailContent table.mails td.subject .labels {
+  height: 1.65em;
+  overflow: hidden;
+}
+#webmailContent table.mails td.subject .labels .label {
+  margin: 0 1px;
+  padding: 0 1px;
+  color: #fff;
+  font-weight: lighter;
+  font-size: 0.8em;
+}
+#webmailContent table.mails td.subject .loading {
+  background-image: url(../images/other/loading_16.gif);
+  background-repeat: no-repeat;
+  background-position: center center;
+  width: 16px;
+  height: 1.65em;
+  float: left;
+  margin-right: 2px;
+}
 #webmailContent table.mails tr:hover td {
   background-color: #ffb;
 }

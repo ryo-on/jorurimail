@@ -16,6 +16,8 @@ class Core
   cattr_accessor :imap
   cattr_accessor :user
   cattr_accessor :user_group
+  cattr_accessor :switch_users
+  cattr_accessor :current_user
   cattr_accessor :dispatched
 ###  cattr_accessor :concept
   cattr_accessor :messages

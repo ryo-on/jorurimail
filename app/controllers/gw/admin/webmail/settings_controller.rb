@@ -28,7 +28,7 @@ class Gw::Admin::Webmail::SettingsController < Gw::Controller::Admin::Base
 
   def update
     @item = Gw::WebmailSetting.user_config(params[:id])
-    @item.value = params[:item][:value]
+    @item.set_value(params)
     
     _update(@item) do
       if Joruri.config.application['webmail.synchronize_mobile_setting'] == 1
@@ -59,7 +59,7 @@ protected
   def synchronize_mobile_setting(item)
     case item.name.intern
     when :mobile_access, :mobile_password
-      user = Pref::Gw::SystemUser.get_user(Core.user.account, Core.user.password)
+      user = System::User.find(:first, :conditions => {:code => Core.user.account})
       if user && !Gw::WebmailSetting.save_mobile_setting_for_user(user, item)
         flash[:notice] = "グループウェアの同期処理に失敗しました。"
       end

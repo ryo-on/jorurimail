@@ -400,6 +400,18 @@ function toggleAddressInput(type) {
   var buttonElm = $(type + 'ToggleButton');
   if (buttonElm && buttonElm.visible()) buttonElm.hide();
 } 
+
+function openScheduleWindow() {
+  $('schedule_title').value = $('item_in_subject').value;
+  if ($('item_in_format').value == 'html') {
+    var html = tinyMCE.activeEditor.getContent();
+    $('schedule_memo').value = html_to_text(html);
+  } else {
+    $('schedule_memo').value = $('item_in_body').value;
+  }
+  window.open('', 'scheduleWindow_<%=escape_javascript Core.now.gsub(/[\W]/, '') %>', 'resizable=yes,scrollbars=yes,location=yes,menubar=1,toolbar=1');
+  document.scheduleForm.submit();
+}
 //]]>
 </script>
 
@@ -473,6 +485,10 @@ function toggleAddressInput(type) {
 
 <%= show_tag_if 'div', html_format, :id => 'htmlFormatEditor', :class => 'htmlFormatEditor' do %>
   <%= f.text_area :in_html_body, :class => 'mceEditor' %>
+<% end %>
+
+<% if Joruri.config.application['webmail.show_gw_schedule_link'] == 1 %>
+<%= link_to 'スケジュールを作成する', '#', :class => 'scheduleLink', :onclick => 'openScheduleWindow(); return false;' %>
 <% end %>
 
 <div class="recipientConfirm">

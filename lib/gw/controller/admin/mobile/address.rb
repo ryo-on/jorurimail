@@ -21,6 +21,9 @@ protected
       session[:mobile][t] += ids_to_addrs(params[t])
       flash["mail_#{t}".intern] = session[:mobile][t].uniq.join(', ')
     end
+    [:subject, :body].each do |t|
+      flash["mail_#{t}".intern] = session[:mobile][t]
+    end
     
     location = {
       :controller => 'gw/admin/webmail/mails',

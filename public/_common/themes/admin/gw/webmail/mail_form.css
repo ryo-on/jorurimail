@@ -59,6 +59,13 @@ div.recipientConfirm {
 div.recipientConfirm * {
   vertical-align: middle;
 }
+a.scheduleLink {
+  float: left;
+  background-image: url("../images/ic-month.gif");
+  background-repeat: no-repeat;
+  background-position: left center;
+  padding-left: 15px;
+}
 
 /* form input, etc
 --------------------------------------------------------- */

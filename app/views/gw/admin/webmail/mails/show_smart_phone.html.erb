@@ -33,6 +33,41 @@ function starMail(uid) {
     }
   });
 }
+
+function toggleLabelMenu() {
+  $('labelMenu').toggle();
+  var html = $('labelEditLink').innerHTML;
+  if (html.match('▼')) {
+    $('labelEditLink').innerHTML = html.replace(/▼/,'▲');
+  } else {
+    $('labelEditLink').innerHTML = html.replace(/▲/,'▼');
+  }
+}
+function labelMail(uid, label_id) {
+  $('mail_' + uid + '_labels').style.display = 'none';
+  $('mail_' + uid + '_label_loading').style.display = 'block';
+  var ajax = new Ajax.Request('<%=raw escape_javascript label_gw_webmail_mails_path(@mailbox.name) %>', {
+    method: 'get',
+    parameters: {
+      id: uid,
+      label: label_id
+    },
+    onSuccess: function(request) {
+      updateLabels(uid, request.responseText);
+    },
+    onFailure: function(request) {
+      alert('通信に失敗しました。');
+    },
+    onComplete: function(request) {
+      $('mail_' + uid + '_labels').style.display = 'block';
+      $('mail_' + uid + '_label_loading').style.display = 'none';
+    }
+  });
+}
+function updateLabels(uid, html) {
+  var elm = $('mail_' + uid + '_labels');
+  if (elm) { elm.innerHTML = html; }
+}
 //]]>
 </script>
 <div class="link">
@@ -85,7 +120,32 @@ function starMail(uid) {
       <%= raw %Q(<a href="#attachments" class="attachmentMark" title="#{(@item.attachments.collect{|a| a.name}).join(', ')}">添付ファイル有り</a>) %>
       <% end %>
       <a class="<%= @item.starred? ? "starOn" : "starOff" %>" id="mail_star_<%= @item.uid %>" onclick="starMail('<%= @item.uid %>');"></a>
+      <span id="mail_<%= @item.uid %>_labels" class="labels">
+        <% @item.labels.each do |label| %>
+          <% if label_conf = @label_confs.find{|conf| conf[:id] == label} %>
+            <% concat raw %Q(<span class="label" style="background-color:#{label_conf[:color]};">#{label_conf[:name]}</span>) %>
+          <% end %>
+        <% end %>
+      </span>
+      <span id="mail_<%= @item.uid %>_label_loading" class="loading label-loading" style="display:none;"></span>
     </td>
+  </tr>
+</table>
+
+<table class="labelEdit">
+  <tr><td>
+    <%= link_to 'ラベルを編集▼', '#', :id => "labelEditLink", :onclick => 'toggleLabelMenu(); return false;' %>
+  </td></tr> 
+</table>
+
+<table id="labelMenu" class="labelMenus" style="display:none;">
+  <% @label_confs.each_with_index do |label_conf, i| %>
+    <% if i%3 == 0 %><tr><% end %>
+    <td class="labelMenu"><%= link_to "#{label_conf[:name]}", '#', :onclick => "labelMail('#{@item.uid}', '#{label_conf[:id]}'); return false;" %></td>
+    <% if i%3 == 2 %></tr><% end %>
+  <% end %>
+  <tr>
+  <td class="labelMenu" colspan="3"><%= link_to 'すべてはずす', '#', :onclick => "labelMail('#{@item.uid}', '0'); return false;" %></td>
   </tr>
 </table>
 

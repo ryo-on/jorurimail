@@ -1,9 +1,13 @@
 <%
-assert = "\n\n\n-------\nこのメールは携帯端末から送信しています。\n"
+assert = "このメールは携帯端末から送信しています。"
 if @item.in_format == Gw::WebmailMail::FORMAT_HTML
-  @item.in_html_body = "#{@item.in_html_body}#{assert}"
+  if @item.in_html_body !~ /^#{assert}/
+    @item.in_html_body = "#{@item.in_html_body}\n\n-------\n#{assert}\n"
+  end
 else
-  @item.in_body = "#{@item.in_body}#{assert}"
+  if @item.in_body !~ /^#{assert}/
+    @item.in_body = "#{@item.in_body}\n\n-------\n#{assert}\n"
+  end
 end
 
 cond = Condition.new do |c|
@@ -35,8 +39,9 @@ window.onload = function() {
 </script>
 
 <%= hidden_field_tag "mobile[action]", params[:action] %>
+<%= hidden_field_tag "mobile[form_action]", @form_action %>
 <%= hidden_field_tag "mobile[mailbox]", @mailbox.name %>
-<%= hidden_field_tag "mobile[uid]", @ref.uid if @ref %>
+<%= hidden_field_tag "mobile[uid]", params[:id] if params[:id] %>
 <%= hidden_field_tag "mobile[qt]", params[:qt] %>
 <%= hidden_field_tag :id, params[:id] %>
 

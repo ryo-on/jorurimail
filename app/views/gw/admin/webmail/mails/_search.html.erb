@@ -7,6 +7,7 @@ fromto = @mailbox.name =~ /^(Sent|Drafts)(\.|$)/ ? ["受信者","to"] : ["差出
 skopts = [["件名","subject"],fromto,["送信日時","date"],["サイズ","size"]]
 soopts = [["昇順",""],["降順","reverse"]]
 ssopts = [["",""],["スター付き優先","1"]]
+slopts = [["すべて",""]] + @label_confs.map{|conf| [conf[:name], conf[:id]]}
 
 disp  = params[:search] ? "block" : "none"
 
@@ -35,6 +36,10 @@ disp  = params[:search] ? "block" : "none"
       <%= select_tag('sort_key', options_for_select(skopts, params[:sort_key])) %>
       <%= select_tag('sort_order', options_for_select(soopts, params[:sort_order])) %>
       <%= select_tag('sort_starred', options_for_select(ssopts, params[:sort_starred])) %>
+    </td>
+    <th>ラベル</th>
+    <td>
+      <%= select_tag('s_label', options_for_select(slopts, params[:s_label])) %>
     </td>
   </tr>
 </table>

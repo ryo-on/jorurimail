@@ -38,7 +38,7 @@ class Gw::WebmailMail
   end
   
   def find_node
-    cond = {:user_id => Core.user.id, :uid => uid, :mailbox => mailbox}
+    cond = {:user_id => Core.current_user.id, :uid => uid, :mailbox => mailbox}
     Gw::WebmailMailNode.find(:first, :conditions => cond)
   end
   
@@ -124,6 +124,8 @@ class Gw::WebmailMail
   end
   
   def prepare_mail(request = nil)
+    @charset = Gw::WebmailSetting.user_config_value(:mail_encoding, "iso-2022-jp")
+    
     mail = Mail.new
     mail.charset     = @charset
     mail.from        = @in_from_addr[0]
@@ -192,6 +194,8 @@ class Gw::WebmailMail
   end
 
   def prepare_mdn(original, send_mode = 'manual', request = nil)
+    @charset = Gw::WebmailSetting.user_config_value(:mail_encoding, "iso-2022-jp")
+    
     mail = Mail.new    
     mail.charset = @charset
     from = parse_address(in_from)[0]
@@ -254,7 +258,7 @@ class Gw::WebmailMail
     ## load cache
     if use_cache
       node = Gw::WebmailMailNode.new
-      node.and :user_id, Core.user.id
+      node.and :user_id, Core.current_user.id
       node.and :uid, 'IN', uids
       node.and :mailbox, mailbox
       if (nodes = node.find(:all)).size > 0
@@ -293,7 +297,7 @@ class Gw::WebmailMail
       
       ## save cache
       node = Gw::WebmailMailNode.new({
-        :user_id         => Core.user.id,
+        :user_id         => Core.current_user.id,
         :uid             => item.uid,
         :mailbox         => mailbox,
         :message_date    => item.date,
@@ -383,7 +387,7 @@ class Gw::WebmailMail
     
     addrs.each do |addr|
       item = Gw::WebmailMailAddressHistory.new(
-        :user_id => Core.user.id, 
+        :user_id => Core.current_user.id, 
         :address => addr[:address], 
         :friendly_address => addr[:friendly_address]
       )
@@ -391,12 +395,12 @@ class Gw::WebmailMail
     end
     
     max_count = Joruri.config.application['webmail.mail_address_history_max_count']
-    curr_count = Gw::WebmailMailAddressHistory.count(:conditions => {:user_id => Core.user.id})
+    curr_count = Gw::WebmailMailAddressHistory.count(:conditions => {:user_id => Core.current_user.id})
     
     if curr_count > max_count
       Gw::WebmailMailAddressHistory.connection.execute(
         "DELETE FROM gw_webmail_mail_address_histories 
-          WHERE user_id = #{Core.user.id} ORDER BY created_at LIMIT #{curr_count - max_count}"
+          WHERE user_id = #{Core.current_user.id} ORDER BY created_at LIMIT #{curr_count - max_count}"
       )
     end
   end

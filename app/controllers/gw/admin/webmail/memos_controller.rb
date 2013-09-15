@@ -3,6 +3,10 @@ class Gw::Admin::Webmail::MemosController < Gw::Controller::Admin::Base
   include Sys::Controller::Scaffold::Base
   layout "admin/gw/webmail"
   
+  def index
+    redirect_to url_for(:action => :show, :id => 0)
+  end
+  
   def show
     @item = memo_body_item
     

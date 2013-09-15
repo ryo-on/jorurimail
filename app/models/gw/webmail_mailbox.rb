@@ -35,7 +35,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
   end
   
   def self.load_mailbox(mailbox)
-    if box = find(:first, :conditions => {:user_id => Core.user.id, :name => mailbox})
+    if box = find(:first, :conditions => {:user_id => Core.current_user.id, :name => mailbox})
       imap.select(mailbox)
       imap.expunge
       unseen = imap.status(mailbox, ['UNSEEN'])['UNSEEN']
@@ -47,7 +47,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
     end
     load_mailboxes(:all)
     self.new({
-      :user_id  => Core.user.id,
+      :user_id  => Core.current_user.id,
       :name     => mailbox,
       :title    => name_to_title(mailbox).gsub(/.*\./, '')
     })
@@ -55,7 +55,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
   
   def self.load_mailboxes(reload = nil)
     if reload.class == String
-      if box = find(:first, :conditions => {:user_id => Core.user.id, :name => reload})
+      if box = find(:first, :conditions => {:user_id => Core.current_user.id, :name => reload})
         status = imap.status(reload, ['MESSAGES', 'UNSEEN', 'RECENT'])
         box.messages = status['MESSAGES']
         box.unseen   = status['UNSEEN']
@@ -69,7 +69,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
         reload = :all
       else
         reload.each do |boxname|
-          if box = find(:first, :conditions => {:user_id => Core.user.id, :name => boxname})
+          if box = find(:first, :conditions => {:user_id => Core.current_user.id, :name => boxname})
             status = imap.status(boxname, ['MESSAGES', 'UNSEEN', 'RECENT'])
             box.messages = status['MESSAGES']
             box.unseen   = status['UNSEEN']
@@ -81,47 +81,50 @@ class Gw::WebmailMailbox < ActiveRecord::Base
       end
     end
     
-    boxes = find(:all, :conditions => {:user_id => Core.user.id}, :order => :sort_no)
-    return boxes if reload == nil && boxes.size > 0
-    
-    need = ['Drafts', 'Sent', 'Archives', 'Trash', 'Star']
-    (imap_boxes = imap_mailboxes).each do |box|
-      need.delete('Drafts')   if box.name == 'Drafts'
-      need.delete('Sent')     if box.name == 'Sent'
-      need.delete('Trash')    if box.name == 'Trash'
-      need.delete('Archives') if box.name == 'Archives'
-      need.delete('Star')     if box.name == 'Star'
-    end
-    if need.size > 0
-      need.each {|name| imap.create(name) }
-      imap_boxes = imap_mailboxes
-    end
-    
-    imap_box_names = imap_boxes.collect{|b| b.name}
-    boxes.each {|box| box.destroy unless imap_box_names.index(box.name) }
-    
-    imap_boxes.each_with_index do |box, idx|
-      item = nil
-      boxes.each do |b|
-        if b.name == box.name
-          item = b
-          break
-        end
+    Util::Database.lock_by_name(Core.current_user.account) do
+      boxes = find(:all, :conditions => {:user_id => Core.current_user.id}, :order => :sort_no)
+      return boxes if reload == nil && boxes.size > 0
+      
+      need = ['Drafts', 'Sent', 'Archives', 'Trash', 'Star']
+      (imap_boxes = imap_mailboxes).each do |box|
+        need.delete('Drafts')   if box.name == 'Drafts'
+        need.delete('Sent')     if box.name == 'Sent'
+        need.delete('Trash')    if box.name == 'Trash'
+        need.delete('Archives') if box.name == 'Archives'
+        need.delete('Star')     if box.name == 'Star'
       end
-      status = imap.status(box.name, ['MESSAGES', 'UNSEEN', 'RECENT'])
-      item ||= self.new
-      item.attributes = {
-        :user_id  => Core.user.id,
-        :sort_no  => idx + 1,
-        :name     => box.name,
-        :title    => name_to_title(box.name).gsub(/.*\./, ''),
-        :messages => status['MESSAGES'],
-        :unseen   => status['UNSEEN'],
-        :recent   => status['RECENT']
-      }
-      item.save(:validate => false) if item.changed?
+      if need.size > 0
+        need.each {|name| imap.create(name) }
+        imap_boxes = imap_mailboxes
+      end
+      
+      imap_box_names = imap_boxes.collect{|b| b.name}
+      boxes.each {|box| box.destroy unless imap_box_names.index(box.name) }
+      
+      imap_boxes.each_with_index do |box, idx|
+        item = nil
+        boxes.each do |b|
+          if b.name == box.name
+            item = b
+            break
+          end
+        end
+        status = imap.status(box.name, ['MESSAGES', 'UNSEEN', 'RECENT'])
+        item ||= self.new
+        item.attributes = {
+          :user_id  => Core.current_user.id,
+          :sort_no  => idx + 1,
+          :name     => box.name,
+          :title    => name_to_title(box.name).gsub(/.*\./, ''),
+          :messages => status['MESSAGES'],
+          :unseen   => status['UNSEEN'],
+          :recent   => status['RECENT']
+        }
+        item.save(:validate => false) if item.changed?
+      end
     end
-    return find(:all, :conditions => {:user_id => Core.user.id}, :order => :sort_no)
+    
+    return find(:all, :conditions => {:user_id => Core.current_user.id}, :order => :sort_no)
   end
   
   def self.load_starred_mails(mailbox_uids = nil)
@@ -182,7 +185,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
   
   def self.load_quota(reload = nil)
     quota = nil
-    cond  = {:user_id => Core.user.id, :name => 'quota_info'}
+    cond  = {:user_id => Core.current_user.id, :name => 'quota_info'}
     st    = Gw::WebmailSetting.find(:first, :conditions => cond)
     
     if reload != :force
@@ -269,27 +272,27 @@ class Gw::WebmailMailbox < ActiveRecord::Base
   end
   
   def self.exist?(mailbox)
-    find(:first, :conditions => {:user_id => Core.user.id, :name => mailbox.to_s}) ? true : false
+    find(:first, :conditions => {:user_id => Core.current_user.id, :name => mailbox.to_s}) ? true : false
   end
   
   def readable
-    self.and :user_id, Core.user.id
+    self.and :user_id, Core.current_user.id
     self
   end
   
   def creatable?
-    return true if Core.user.has_auth?(:manager)
-    user_id == Core.user.id
+    return true if Core.current_user.has_auth?(:manager)
+    user_id == Core.current_user.id
   end
   
   def editable?
-    return true if Core.user.has_auth?(:manager)
-    user_id == Core.user.id
+    return true if Core.current_user.has_auth?(:manager)
+    user_id == Core.current_user.id
   end
   
   def deletable?
-    return true if Core.user.has_auth?(:manager)
-    user_id == Core.user.id
+    return true if Core.current_user.has_auth?(:manager)
+    user_id == Core.current_user.id
   end
   
   def draft_box?(target = :self)
@@ -330,7 +333,7 @@ class Gw::WebmailMailbox < ActiveRecord::Base
   
   def children
     cond = Condition.new
-    cond.and :user_id, Core.user.id
+    cond.and :user_id, Core.current_user.id
     cond.and :name, '!=', "#{name}"
     cond.and :name, 'like', "#{name}.%"
     items = find(:all, :conditions => cond.where, :order => :sort_no)

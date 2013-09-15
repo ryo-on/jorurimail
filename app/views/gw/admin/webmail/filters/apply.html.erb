@@ -19,6 +19,11 @@ end
 
 <table class="show">
   <tr>
+    <th>アカウント</th>
+    <td>
+      <%= "#{Core.current_user.name}（#{Core.current_user.account}）" %>
+    </td>
+  </tr><tr>
     <th><%= @item.locale(:name) %></th>
     <td><%=h @item.name %></td>
   </tr><tr>

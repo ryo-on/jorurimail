@@ -83,6 +83,21 @@ Joruri::Application.routes.draw do
         resources "docs",
           :controller => "docs",
           :path => "docs"
+        resources "switch_users",
+          :controller => "switch_users",
+          :path => "switch_users" do
+            collection do
+              post :import
+            end
+          end
+        resources "product_synchros",
+          :controller => "product_synchros",
+          :path => "product_synchros" do
+            collection do
+              get :synchronize
+              post :synchronize
+            end
+          end
         match ":parent/inline_files/files/(:name(.:format))" => "inline/files#download"
       end
     end

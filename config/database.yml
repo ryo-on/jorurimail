@@ -8,19 +8,19 @@ development:
   host: 127.0.0.1
 
 test:
-  adapter : 
-  database: 
-  username: 
-  password: 
-  timeout : 
-  encoding: 
-  host: 
+  adapter :
+  database:
+  username:
+  password:
+  timeout :
+  encoding:
+  host:
 
 production:
-  adapter : 
-  database: 
-  username: 
-  password: 
-  timeout : 
-  encoding: 
-  host: 
+  adapter :
+  database:
+  username:
+  password:
+  timeout :
+  encoding:
+  host:

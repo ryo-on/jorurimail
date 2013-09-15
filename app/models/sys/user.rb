@@ -1,6 +1,6 @@
 # encoding: utf-8
 require 'digest/sha1'
-class Sys::User < ActiveRecord::Base
+class Sys::User < Sys::ManageDatabase
   include Sys::Model::Base
   include Sys::Model::Base::Config
   include Sys::Model::Rel::RoleName
@@ -12,8 +12,8 @@ class Sys::User < ActiveRecord::Base
     :class_name => 'Sys::UsersGroup'  , :primary_key => :id
   has_and_belongs_to_many :groups,
     :class_name => 'Sys::Group', :join_table => 'sys_users_groups'
-  has_and_belongs_to_many :role_names, :association_foreign_key => :role_id,
-    :class_name => 'Sys::RoleName', :join_table => 'sys_users_roles'
+  #has_and_belongs_to_many :role_names, :association_foreign_key => :role_id,
+  #  :class_name => 'Sys::RoleName', :join_table => 'sys_users_roles'
     
   has_many :logins, :foreign_key => :user_id, :class_name => 'Sys::UserLogin',
     :order => 'id desc', :dependent => :delete_all

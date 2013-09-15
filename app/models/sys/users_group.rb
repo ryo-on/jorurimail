@@ -1,4 +1,4 @@
-class Sys::UsersGroup < ActiveRecord::Base
+class Sys::UsersGroup < Sys::ManageDatabase
   include Sys::Model::Base
   include Sys::Model::Base::Config
   include Sys::Model::Auth::Manager

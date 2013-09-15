@@ -14,8 +14,9 @@ class Sys::Controller::Admin::Base < ApplicationController
       Core.user          = current_user
       Core.user.password = Util::String::Crypt.decrypt(session[PASSWD_KEY])
       Core.user_group    = current_user.groups[0]
+      return true
     end
-    return true
+    return false
   end
   
   def pre_dispatch

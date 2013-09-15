@@ -4,11 +4,11 @@ development:
   base: dc=www,dc=joruri,dc=org
 
 test:
-  host: 
-  port: 
-  base: 
+  host:
+  port:
+  base:
 
 production:
-  host: 
-  port: 
-  base: 
+  host:
+  port:
+  base:

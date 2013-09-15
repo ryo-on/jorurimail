@@ -32,7 +32,7 @@ end
   <tr>
     <th class="drag"></th>
     <th class="check"><input type="checkbox" onclick="checkAll(this.checked)" value="0" /></th>
-    <th class="<%= star_class %>" title="スター" onclick="window.location.href='<%= url_for(@s_params.merge(:sort_starred => sort_starred)) %>';"></th>
+    <th class="<%= star_class %>" title="スター" onclick="window.location.href='<%=raw escape_javascript url_for(@s_params.merge(:sort_starred => sort_starred)) %>';"></th>
     <th class="attach" title="添付ファイル">添</th>
     <th class="subject"><%= link_to '件名' + sort_mark(:subject), sort_link(:subject), :class => 'sorter' %></th>
     <% if @mailbox.name =~ /^(Star)$/ %>
@@ -59,7 +59,7 @@ end
     flag += "forwarded" if item.forwarded?
     mdnRequest = item.has_disposition_notification_to? ? 'mdnRequest' : ''
     uri = url_for(@s_params.merge(:action => :show, :id => item.uid, :new_window => (@mail_open_window.blank? ? nil : 1)))
-    click = %Q[onclick="openMail('#{uri}', #{!@mail_open_window.blank?}); return false;"].html_safe
+    click = %Q[onclick="openMail('#{raw escape_javascript uri}', #{!@mail_open_window.blank?}); return false;"].html_safe
     from_tooltip = value = truncate(item.subject, :length => 70)
     s_from = from = item.friendly_from_addr
     if @mailbox.name =~ /^(Sent|Drafts)(\.|$)/
@@ -76,8 +76,21 @@ end
     <td class="check"><input type="checkbox" name="item[ids][<%= item.uid %>]" value="1" /></td>
     <td class="<%= star %>" id="mail_star_<%= item.uid %>" title="<%= star_title %>" onclick="starMail('<%= item.uid %>');"></td>
     <td class="attach"><%=raw %Q(<span class="attach" title="添付ファイル">有</span>) if item.has_attachments? %></td>
-    <td class="subject <%= flag %> <%= mdnRequest %> <%= subject_wrap %>" <%= click %>><span class="overflowHidden <%= subject_wrap %>" title="<%= item.subject %>">
-      <%= link_to mail_text_wrap(value), url_for(:action => :show, :id => item.uid) %></span></td>
+    <td class="subject <%= flag %> <%= mdnRequest %> <%= subject_wrap %>" <%= click %>>
+      <span class="overflowHidden <%= subject_wrap %>" title="<%= item.subject %>">
+        <a href="<%= url_for(:action => :show, :id => item.uid) %>" style="float:left;">
+          <span id="mail_<%= item.uid %>_labels" class="labels" style="<%= 'display:none;' if item.labels.count == 0 %>">
+            <% item.labels.each do |label| %>
+              <% if label_conf = @label_confs.find{|conf| conf[:id] == label} %>
+                <% concat raw %Q(<span class="label" style="background-color: #{label_conf[:color]};">#{label_conf[:name]}</span>) %>
+              <% end %>
+            <% end %>
+          </span>
+          <span id="mail_<%= item.uid %>_label_loading" class="loading" style="display:none;"></span>
+          <%= mail_text_wrap(value) %>
+        </a>
+      </span>
+    </td>
     <% if @mailbox.name =~ /^(Star)$/ %>
     <td class="mailbox" <%= click %>><span class="overflowHidden">
       <%= safe{@mailboxes.find{|x| x.name == item.node.ref_mailbox}.title} if item.node %></span></td>

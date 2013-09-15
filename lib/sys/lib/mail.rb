@@ -60,7 +60,7 @@ module Sys::Lib::Mail
     if all_members
       addrs += friendly_to_addrs
       addrs = uniq_addrs(addrs)
-      addrs.delete_if{|a| a.index(Core.user.email)} if addrs.size > 1
+      addrs.delete_if{|a| a.index(Core.current_user.email)} if addrs.size > 1
     end
     addrs
   rescue => e

@@ -29,6 +29,9 @@ module Gw::Controller::Admin::Mobile::Mail
       [:to, :cc, :bcc].each do |t|
         session[:mobile][t] = params[:item]["in_#{t}".intern].split(/,/).each {|x| x.strip! }
       end
+      [:subject, :body].each do |t|
+        session[:mobile][t] = params[:item]["in_#{t}".intern]
+      end
     end
     
     if params[:addSysAddress]

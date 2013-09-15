@@ -1,7 +1,7 @@
 # encoding: utf-8
 module Joruri
   def self.version
-    "1.1.0"
+    "1.2.0"
   end
   
   def self.default_config
@@ -10,13 +10,14 @@ module Joruri
         "sys.mobile_footer"                      => "",
         "sys.session_expiration"                 => 24,
         "sys.session_expiration_for_mobile"      => 1,
-        "sys.force_mobile_site"                  => 0,
+        "sys.force_site"                         => "",
         "webmail.mailbox_quota_alert_rate"       => 0.85,
         "webmail.attachment_file_max_size"       => 5,
         "webmail.show_only_ldap_user"            => 1,
         "webmail.filter_condition_max_count"     => 100,
         "webmail.mail_address_history_max_count" => 100,
         "webmail.synchronize_mobile_setting"     => 0,
+        "webmail.show_gw_schedule_link"          => 1,
         "webmail.mail_menu"                      => "メール",
         "webmail.mailbox_menu"                   => "フォルダ",
         "webmail.sys_address_menu"               => "組織アドレス帳",
