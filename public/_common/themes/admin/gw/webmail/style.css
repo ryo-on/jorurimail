@@ -282,7 +282,7 @@ form.search td input.email {
   padding: 0px;
 }
 #webmailMenu .mailbox li {
-  position: relative;
+  xposition: relative;
   margin: 0px;
   padding: 0px;
 }
@@ -397,7 +397,7 @@ form.search td input.email {
 }
 
 #webmailMenu .addressTree li a {
-  position: relative;
+  xposition: relative;
   margin-left: 13px;
 }
 #webmailMenu .mailbox li button.deleteGroup { /* address */
@@ -406,11 +406,11 @@ form.search td input.email {
 #webmailMenu .mailbox li.folder a.toggleGroups { /* sys_address */
   display: inline-block;
   position: absolute;
-  top: 6px;
+  xtop: 6px;
   overflow: hidden;
   width: 11px;
   height: 11px;
-  margin: 0;
+  margin: 5px 0 0 0;
   padding: 0;
   background-position: 0 0;
   font-size: 0px;

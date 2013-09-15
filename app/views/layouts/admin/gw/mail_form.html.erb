@@ -10,13 +10,21 @@
 <%= javascript_include_tag :defaults %>
 <%= javascript_include_tag '/_common/js/cookiemanager.js' %>
 <%= javascript_include_tag '/_common/js/navigation.js' %>
+<%= javascript_include_tag '/_common/js/jquery/jquery.min.js' %>
+<%= javascript_include_tag '/_common/js/jquery/jquery-ui.min.js' %>
 <%= csrf_meta_tag %>
 <%#= javascript_include_tag '/_common/js/prototype' %>
 <%#= stylesheet_link_tag '/_common/themes/admin/style', :media => 'all' %>
+<%= stylesheet_link_tag '/_common/js/jquery/jquery-ui.css' %>
 <%= stylesheet_link_tag '/_common/themes/admin/gw/webmail/style', :media => 'all' %>
 <%= stylesheet_link_tag '/_common/themes/admin/gw/print', :media => 'print' %>
-<%= javascript_tag "new Navigation({});" %>
 <%= yield :header %>
+<script type="text/javascript">
+//<![CDATA[
+jQuery.noConflict();
+//]]>
+</script>
+<%= javascript_tag "new Navigation({});" %>
 </head>
 <body><a id="top" name="top"></a>
 <%

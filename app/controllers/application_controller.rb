@@ -7,6 +7,7 @@ class ApplicationController < ActionController::Base
   protect_from_forgery #:secret => '1f0d667235154ecf25eaf90055d99e99'
   before_filter :initialize_application
   after_filter :inline_css_for_mobile
+  after_filter :set_content_type_for_mobile
   rescue_from Exception, :with => :rescue_exception
   trans_sid
   
@@ -84,6 +85,17 @@ class ApplicationController < ActionController::Base
       end
       m.gsub!(/url\(\.\/(.+)\);/, "url(#{File.dirname(path)}/\\1);")
       m
+    end
+  end
+  
+  def set_content_type_for_mobile
+    if request.mobile? && !request.smart_phone?
+      case request.mobile
+      when Jpmobile::Mobile::Docomo
+        if request.mobile.imode_browser_version == '1.0'
+          response.headers["Content-Type"] = "application/xhtml+xml; charset=#{request.mobile.default_charset}"
+        end
+      end
     end
   end
   

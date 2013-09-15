@@ -90,7 +90,9 @@ function toggleView(type) {
       case 'html':
         if (textElm.visible()) textElm.hide();
         if (!htmlElm.visible()) htmlElm.show();
-        htmlElm.innerHTML = $('htmlBody_' + idx).value;
+        (function($) {
+          $(htmlElm).html($('#htmlBody_' + idx).val());
+        })(jQuery);
         break;
       }
     }

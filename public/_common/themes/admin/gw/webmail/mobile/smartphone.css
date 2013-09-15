@@ -60,6 +60,7 @@ i {
   font-style: oblique;
 }
 body {
+  font-family: ArialMT, "Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", "MS PGothic", "ＭＳ　Ｐゴシック", sans-serif;
   font-size: 80%;
 }
 
@@ -447,7 +448,7 @@ table.mails td.attach {
 }
 table.mails th.attach
 {
-  vertical-align: center;
+  vertical-align: middle;
   width: 10px;
   background-image: url("/_common/themes/admin/gw/images/mailoption/clip.gif");
   background-position: center center;
@@ -565,7 +566,6 @@ table.mails td.loading {
   padding: 0 15px;
   background-color: #DDEEFF;
   text-decoration: none;
-  font-family: "MS PGothic";
   font-size: 100%;
 }
 .pagination span.current, 

@@ -20,7 +20,7 @@ pri_search_field_options = [['名前', 's_name_or_kana'], ['メールアドレ�
   <tr>
     <td rowspan="3" class="addressesColumn">
       <div id="sysAddresses" class="addresses" style="display:none"><ul id="sysAddressesRoot">
-        <% Sys::Group.find(:all, :conditions => {:parent_id => 1}, :order => :sort_no).each do |g| %>
+        <% Sys::Group.find(:all, :conditions => {:parent_id => 1, :state => 'enabled'}, :order => :sort_no).each do |g| %>
         <li class="group" id="sysGroup<%= g.id %>">
         <% if g.enabled_children.length > 0 %>
           <%= link_to '+', '#', :id => "sysToggleItems#{g.id}", :class => "toggleItems toggleItemsClose",

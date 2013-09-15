@@ -145,7 +145,7 @@ function removeUnseenClass(mailbox, uid) {
         var target = $(e.currentTarget).parents('table.mails tr.mail');
         $('table.mails tr.mail').each(function() {
           if ($(this).get(0) == target.get(0) || $(this).find('input').is(':checked')) {
-            var elm = $('<span />').text($(this).find('td.subject span.subject').text());
+            var elm = $('<span />').text($(this).find('td.subject a').text());
             elm.css('padding', '0px 12px');
             container.append(elm);
           }

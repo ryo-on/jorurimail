@@ -28,13 +28,13 @@ module Sys::Lib::Mail
     return field.to_s if field.to_s.encoding.name == 'UTF-8' rescue nil ##
     field.blank? ? 'unknown' : decode(field.value)
   rescue => e
-    "#read failed: #{e}"
+    "#read failed: #{e}" rescue ''
   end
   
   def friendly_to_addrs
     collect_addrs(@mail.header[:to])
   rescue => e
-    ["#read failed: #{e}"]
+    ["#read failed: #{e}"] rescue []
   end
   
   def simple_to_addr
@@ -45,13 +45,13 @@ module Sys::Lib::Mail
   def friendly_cc_addrs
     collect_addrs(@mail.header[:cc])
   rescue => e
-    ["#read failed: #{e}"]
+    ["#read failed: #{e}"] rescue []
   end
   
   def friendly_bcc_addrs
     collect_addrs(@mail.header[:bcc])
   rescue => e
-    ["#read failed: #{e}"]
+    ["#read failed: #{e}"] rescue []
   end
   
   def friendly_reply_to_addrs(all_members = nil)
@@ -64,14 +64,14 @@ module Sys::Lib::Mail
     end
     addrs
   rescue => e
-    ["#read failed: #{e}"]
+    ["#read failed: #{e}"] rescue []
   end
   
   def sender
     field = @mail.header[:sender]
     field.blank? ? friendly_from_addr : decode(field.value)
   rescue => e
-    "#read failed: #{e}"
+    "#read failed: #{e}" rescue ''
   end
   
   def subject
@@ -82,7 +82,7 @@ module Sys::Lib::Mail
     return decode(field.to_s) if field.to_s.encoding.name == 'UTF-8' rescue nil ##
     field.blank? ? 'no subject' : decode(field.value)
   rescue => e
-    "#read failed: #{e}"
+    "#read failed: #{e}" rescue ''
   end
   
   def has_disposition_notification_to?
@@ -183,14 +183,16 @@ module Sys::Lib::Mail
   end
   
   def attachments
-    attachments = []
+    return @attachments if @attachments
+    
+    @attachments = []
     
     attached_files = lambda do |part, level|
       if part.attachment? && !part.filename.blank? && part.mime_type != 'application/applefile'
-        seqno = attachments.size
+        seqno = @attachments.size
         body = part.body.decoded rescue part.body.raw_source
         body = decode_uuencode(body) if part.content_transfer_encoding =~ /uuencode/i
-        attachments << Sys::Lib::Mail::Attachment.new({
+        @attachments << Sys::Lib::Mail::Attachment.new({
           :seqno             => seqno,
           :content_type      => part.mime_type,
           :name              => part.filename.strip,
@@ -200,6 +202,9 @@ module Sys::Lib::Mail
         })            
       elsif part.multipart?
         part.parts.each { |p| attached_files.call(p, level + 1) } if level < @@search_contents_depth
+      elsif part.mime_type == 'message/rfc822'
+        mail = Mail::Message.new(part.body)
+        attached_files.call(mail, 0)
       end
     end
     
@@ -211,7 +216,7 @@ module Sys::Lib::Mail
     
     attached_files.call(@mail, 0)
      
-    attachments
+    @attachments
   end
   
   def disposition_notification_mail?
@@ -285,6 +290,9 @@ module Sys::Lib::Mail
             :content_type => p.mime_type,
             :text_body => decode_text_part(p),
             :attachment => p.attachment?)
+        when p.mime_type == 'message/rfc822'
+          mail = Mail::Message.new(p.body)
+          search_inline.call(mail, 0)
         else
           inlines << Sys::Lib::Mail::Inline.new(
             :seqno => inlines.size,
