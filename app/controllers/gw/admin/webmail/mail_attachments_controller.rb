@@ -35,8 +35,7 @@ class Gw::Admin::Webmail::MailAttachmentsController < ApplicationController#Gw::
     return http_error(404) unless @file
     return http_error(404) unless params[:filename] == @file.name
     
-    filename = @file.name.gsub(/[\/\<\>\|:"\?\*\\]/, '_')
-    filename = URI::escape(filename) if request.env['HTTP_USER_AGENT'] =~ /MSIE/
+    filename = convert_to_download_filename(@file.name)
     
     send_data @file.read, :type => @file.mime_type, :disposition => @file.image_is == 1 ? 'inline' : 'attachment',
       :filename => filename 

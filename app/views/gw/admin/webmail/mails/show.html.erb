@@ -588,7 +588,7 @@ function updateLabels(uid, html) {
   <% end %>
 </div>
 
-<% if @item.has_attachments? %>
+<% if @item.has_attachments? && @item.attachments.size > 0 %>
 <a name="attachments"></a><br />
 
 <table class="attachmentDownloader">

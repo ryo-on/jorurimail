@@ -26,7 +26,10 @@ class Gw::WebmailMailAttachment < ActiveRecord::Base
     
     self.mime_type = file.content_type
     self.size      = file.size
-    raise "容量制限を超えています。＜#{maxsize}MB＞" if size > maxsize
+    raise "容量制限を超えています。＜#{maxsize/(1024**2)}MB＞" if size > maxsize
+    
+    total_size = self.size + self.class.find(:all, :conditions => {:tmp_id => tmp_id}).map{|c| c.size.to_i}.inject(&:+).to_i
+    raise "容量制限を超えています。＜#{maxsize/(1024**2)}MB＞" if total_size > maxsize
     
     self.name    ||= file.original_filename
     self.title   ||= name

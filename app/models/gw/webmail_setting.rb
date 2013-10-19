@@ -31,7 +31,7 @@ class Gw::WebmailSetting < ActiveRecord::Base
   @@config_categorizing = {
     :mail_list => [:mails_per_page, :mail_list_subject, :mail_list_from_address, :mail_address_history],
     :mail_detail => [:mail_open_window, :html_mail_view, :mail_attachment_view],
-    :mail_form => [:mail_from, :mail_form_size, :sign_position],#, :mail_encoding],
+    :mail_form => [:mail_from, :mail_form_size, :sign_position, :mail_encoding],
     :mail_label => [:label1, :label2, :label3, :label4, :label5, :label6, :label7, :label8, :label9],
     :sys_address => [:sys_address_order],
     :address => [:address_order],
@@ -48,7 +48,7 @@ class Gw::WebmailSetting < ActiveRecord::Base
     :mail_open_window => 'メールの表示方法',
     :mail_from => 'メール送信者名',
     :mail_form_size => 'ウィンドウサイズ',
-    #:mail_encoding => '文字エンコーディング',
+    :mail_encoding => '文字エンコーディング',
     :sign_position => '署名の位置（返信・転送時）',
     :sys_address_order => '並び順',
     :address_order => '並び順',

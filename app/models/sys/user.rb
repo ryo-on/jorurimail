@@ -226,15 +226,12 @@ class Sys::User < Sys::ManageDatabase
     self.new.enabled.find(:all, :conditions => {:account => in_account, :state => 'enabled'}).each do |u|
       if u.ldap == 1
         ## LDAP Auth
-        next unless ou1 = u.groups[0]
-        next unless ou2 = ou1.parent
-        dn = "uid=#{u.account},ou=#{ou1.ou_name},ou=#{ou2.ou_name},#{Core.ldap.base}"
-        
         if Core.ldap.connection.bound?
           Core.ldap.connection.unbind
           Core.ldap = nil
         end
-        next unless Core.ldap.bind(dn, in_password)
+        
+        next unless Core.ldap.bind(u.bind_dn, in_password)
         u.password = in_password
       else
         ## DB Auth
@@ -244,6 +241,19 @@ class Sys::User < Sys::ManageDatabase
       break
     end
     return user
+  end
+  
+  def bind_dn
+    return false unless group = self.groups[0]
+    
+    group_path = group.parents_tree.reverse.select{|g| g.level_no > 1}
+    ous = group_path.map{|g| "ou=#{g.ou_name}"}.join(',')
+    
+    Core.ldap.bind_dn
+      .gsub("[base]", Core.ldap.base.to_s)
+      .gsub("[domain]", Core.ldap.domain.to_s)
+      .gsub("[uid]", self.account.to_s)
+      .gsub("[ous]", ous.to_s)
   end
   
   def authenticate_mobile_password(_mobile_password)

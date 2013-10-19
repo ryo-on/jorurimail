@@ -80,7 +80,15 @@ module Sys::Lib::Mail
     field.value = correct_shift_jis(field.value)
     field.value = correct_utf7(field.value)
     return decode(field.to_s) if field.to_s.encoding.name == 'UTF-8' rescue nil ##
-    field.blank? ? 'no subject' : decode(field.value)
+    encoding = field.value.match(/=\?(.+?)\?B\?/)[1] rescue 'US-ASCII'
+    if valid_encodings.find{|enc| enc == encoding.downcase}
+      decode(field.value)
+    else
+      lang = I18n.t(encoding.downcase, :scope => :language)
+      prefix = "非対応"
+      prefix << (lang !~ /^translation missing/ ? "/#{lang}(#{encoding})" : "(#{encoding})")
+      "【#{prefix}】#{decode(field.value)}"
+    end
   rescue => e
     "#read failed: #{e}" rescue ''
   end
@@ -619,4 +627,7 @@ private
     end
   end
   
+  def valid_encodings
+    ['utf-8','unicode-1-1-utf-7','iso-2022-jp','euc-jp','shift_jis','us-ascii']
+  end
 end

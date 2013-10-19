@@ -1,6 +1,7 @@
 # encoding: utf-8
 require 'base64'
 
+
 class Gw::WebmailMail
   include Sys::Lib::Net::Imap
   include Sys::Lib::Mail
@@ -12,7 +13,8 @@ class Gw::WebmailMail
     :in_subject, :in_body, :in_html_body, :in_format, :in_files, :tmp_id, :tmp_attachment_ids, :request_mdn
   
   def initialize(attributes = nil)
-    @charset = "iso-2022-jp"
+    @charset = Gw::WebmailSetting.user_config_value(:mail_encoding, "iso-2022-jp")
+    
     if attributes.class == Gw::WebmailMailNode
       @node = attributes
       self.uid     = @node.uid
@@ -73,6 +75,23 @@ class Gw::WebmailMail
     self.in_body      = NKF.nkf('-Ww', in_body) unless in_body.blank?
     self.in_html_body = NKF.nkf('-Ww', in_html_body) unless in_html_body.blank?
     
+    if in_files.present?
+      in_files.each do |file|
+        attach = Gw::WebmailMailAttachment.new(:tmp_id => tmp_id)
+        if attach.save_file(file)
+          @tmp_attachment_ids ||= []
+          @tmp_attachment_ids << attach.id
+        else
+          attach.errors.full_messages.each{|msg| errors.add(:base, "#{file.original_filename}: #{msg}")}
+        end
+      end
+      
+      ## garbage collect
+      Sys::File.garbage_collect if rand(100) == 0
+    end
+    
+    return if mode == :file
+    
     self.in_subject = "件名なし" if in_subject.blank?
     #errors.add :base, "件名が未入力です。"   if in_subject.blank?
     errors.add :base, "件名は100文字以内で入力してください。" if in_subject.size > 100
@@ -124,8 +143,6 @@ class Gw::WebmailMail
   end
   
   def prepare_mail(request = nil)
-    @charset = Gw::WebmailSetting.user_config_value(:mail_encoding, "iso-2022-jp")
-    
     mail = Mail.new
     mail.charset     = @charset
     mail.from        = @in_from_addr[0]
@@ -194,8 +211,6 @@ class Gw::WebmailMail
   end
 
   def prepare_mdn(original, send_mode = 'manual', request = nil)
-    @charset = Gw::WebmailSetting.user_config_value(:mail_encoding, "iso-2022-jp")
-    
     mail = Mail.new    
     mail.charset = @charset
     from = parse_address(in_from)[0]
@@ -349,7 +364,7 @@ class Gw::WebmailMail
         addr = a.slice(pos, a.size).strip
         ma = Mail::Address.new
         (ma.address = addr) rescue next
-        ma.display_name = mime_encode(name)
+        ma.display_name = mime_encode(name, charset = @charset)
         addrs << ma rescue nil
       else
         addrs << Mail::Address.new(a) rescue nil
@@ -450,6 +465,7 @@ protected
       msg += ";" unless struct.param
       msg += "\r\n"
       if struct.param
+
         struct.param.each_with_index do |(key, value), index|
           if key == "BOUNDARY" || key == "NAME"
             msg += " #{key.downcase}=\"#{value}\""

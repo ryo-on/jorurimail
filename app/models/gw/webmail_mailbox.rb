@@ -188,9 +188,9 @@ class Gw::WebmailMailbox < ActiveRecord::Base
     cond  = {:user_id => Core.current_user.id, :name => 'quota_info'}
     st    = Gw::WebmailSetting.find(:first, :conditions => cond)
     
-    if reload != :force
-      reload = nil if reload && rand(3) != 0
-    end
+    #if reload != :force
+    #  reload = nil if reload && rand(3) != 0
+    #end
     
     if !reload && !st.nil?
       begin

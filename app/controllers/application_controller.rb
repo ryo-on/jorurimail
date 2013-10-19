@@ -99,6 +99,18 @@ class ApplicationController < ActionController::Base
     end
   end
   
+  def convert_to_download_filename(filename)
+    filename = filename.gsub(/[\/\<\>\|:"\?\*\\]/, '_')
+    case
+    when request.env['HTTP_USER_AGENT'] =~ /(MSIE 6|MSIE 7)/
+      filename = NKF.nkf("-s", filename)
+      filename = filename.chars.map{|c| c.unpack("C*").last == 92 ? URI::escape(NKF.nkf("-w", c)) : c.to_s}.join
+    when request.env['HTTP_USER_AGENT'] =~ /MSIE/ 
+      filename = URI::escape(filename)
+    end
+    filename
+  end
+  
 private
   def rescue_exception(exception)
     Core.terminate

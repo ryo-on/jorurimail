@@ -1,6 +1,7 @@
 <%
 html_format = @item.in_format == Gw::WebmailMail::FORMAT_HTML
 attachment_file_max_size = Joruri.config.application['webmail.attachment_file_max_size']
+attachment_file_upload_method = Joruri.config.application['webmail.attachment_file_upload_method']
 %>
 <script type="text/javascript" src="/_common/js/swfupload/swfupload.js"></script>
 <script type="text/javascript" src="/_common/js/swfupload/plugins/swfupload.queue.js"></script>
@@ -34,6 +35,31 @@ window.onload = function() {
   loadUploadedFiles();
   if ($('item_in_format').value == 'html') {
     initTinyMCE();
+  }
+  
+  <% case attachment_file_upload_method %>
+  <% when 'auto' %>
+  if (isFlashInstalled()) {
+    $('flashUploader').style.display = 'block';
+  } else {
+    $('defaultUploader').style.display = 'block';
+  }
+  <% when 'flash' %>
+  $('flashUploader').style.display = 'block';
+  <% else %>
+  $('defaultUploader').style.display = 'block';
+  <% end %>
+}
+// Flashインストールチェック
+function isFlashInstalled() {
+  if (navigator.plugins['Shockwave Flash']) {
+    return true;
+  }
+  try {
+    new ActiveXObject('ShockwaveFlash.ShockwaveFlash');
+    return true;
+  } catch (e) {
+    return false;
   }
 }
 // EnterキーによるSubmitを無効化
@@ -412,6 +438,23 @@ function openScheduleWindow() {
   window.open('', 'scheduleWindow_<%=escape_javascript Core.now.gsub(/[\W]/, '') %>', 'resizable=yes,scrollbars=yes,location=yes,menubar=1,toolbar=1');
   document.scheduleForm.submit();
 }
+
+function uploadAttachmentFile() {
+  var elm = $('item_in_files');
+  var maxsize = <%= attachment_file_max_size %>*1024*1024;
+  if (elm.value == '') { return; }
+  
+  if (elm.files) {
+    if (elm.files[0].size > maxsize) {
+      alert("ファイルサイズが容量制限（<%= attachment_file_max_size %>MB）を超えています。");
+      return;
+    }
+  }
+  
+  $("defaultUploaderProgressName").innerHTML = elm.value;
+  $("defaultUploaderProgress").style.display = "block";
+  $("commit_file").click();
+}
 //]]>
 </script>
 
@@ -453,9 +496,15 @@ function openScheduleWindow() {
     <th>添付 ：</th>
     <td>
       <table style="width: 100%;"><tr><td>
-        <div id="swfupButtons">
-          <span id="spanButtonPlaceHolder"></span
-          ><input id="btnCancel" type="button" value="キャンセル" onclick="swfu.cancelQueue();" disabled="disabled" />
+        <div id="flashUploader" style="display: none;">
+          <div id="swfupButtons">
+            <span id="spanButtonPlaceHolder"></span
+            ><input id="btnCancel" type="button" value="キャンセル" onclick="swfu.cancelQueue();" disabled="disabled" />
+          </div>
+        </div>
+        <div id="defaultUploader" style="display: none;">
+          <%= f.file_field :in_files, :name => 'item[in_files][]', :size => 90, :style => 'width: 300px;', :class => 'file', :onchange => 'uploadAttachmentFile();' %><br />
+          <%= tag :input, :type => 'button', :value => "選択したファイルを添付", :id => "commit_file", :name => "commit_file", :onclick => "checkServerStatus(this); return false;", :style => 'display: none;' %>
         </div>
       </td><td style="vertical-align: bottom;">
         <div class="editorMenu">
@@ -474,6 +523,13 @@ function openScheduleWindow() {
       <div id="uploadedFiles" style="display: none;"></div>
       <div id="divStatus"></div>
       <div id="fsUploadProgress"></div>
+      <div id="defaultUploaderProgress" style="display:none;">
+        <div class="progressWrapper">
+          <div class="progressContainer red">
+          <div id="defaultUploaderProgressName" class="progressName"></div>
+          <div class="progressBarStatus">uploading...</div>
+        </div>
+      </div>
     </td>
   </tr>
 </table>

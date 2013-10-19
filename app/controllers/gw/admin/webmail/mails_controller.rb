@@ -245,9 +245,7 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
       content_type = 'image/jpeg'
     end
     
-    filename = @file.name#@item.mail.unquote(@file.name)
-    filename = filename.gsub(/[\/\<\>\|:;"\?\*\\]/, '_') 
-    filename = URI::escape(filename) if request.env['HTTP_USER_AGENT'] =~ /MSIE/
+    filename = convert_to_download_filename(@file.name)
     
     send_data(filedata, :type => content_type, :filename => filename, :disposition => disposition)
   end
@@ -480,6 +478,12 @@ class Gw::Admin::Webmail::MailsController < Gw::Controller::Admin::Base
     ma.address      = Core.current_user.email
     ma.display_name = Core.current_user.name if config != "only_address"
     item.in_from = ma.to_s
+    
+    ## submit/file
+    if !params[:commit_file].blank?
+      item.valid?(:file)
+      return render(:action => :new)
+    end
     
     ## submit/destroy
     if !params[:commit_destroy].blank?

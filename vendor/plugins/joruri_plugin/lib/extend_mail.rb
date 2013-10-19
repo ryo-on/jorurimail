@@ -290,3 +290,15 @@ if Util::Config.load(:core)['mail_domain'] == 'demo.joruri.org'
     end
   end
 end
+
+class Mail::ContentTypeField
+  unless method_defined? :xxx_parameters
+    alias xxx_parameters parameters
+  end
+  def parameters
+    if xxx_parameters.key?("boundary")
+      xxx_parameters.delete("charset")
+    end
+    xxx_parameters
+  end
+end
